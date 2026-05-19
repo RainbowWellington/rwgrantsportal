@@ -1,1 +1,0 @@
-ALTER TABLE "applications" ADD COLUMN "post_event_files" text;
