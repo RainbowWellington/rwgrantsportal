@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { handleAuthCallback, acceptInvite, AuthError } from "@netlify/identity";
 
 const AUTH_HASH_PATTERN =
@@ -10,19 +10,26 @@ export function CallbackHandler({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const processed = useRef(false);
 
   useEffect(() => {
+    if (processed.current) return;
     if (!AUTH_HASH_PATTERN.test(window.location.hash)) return;
+    processed.current = true;
 
-    handleAuthCallback().then((result) => {
-      if (result?.type === "invite" && result.token) {
-        setInviteToken(result.token);
-      } else if (result?.type === "recovery") {
-        window.location.href = "/reset-password";
-      } else if (result?.type === "confirmation" || result?.type === "oauth") {
-        window.location.href = "/admin";
-      }
-    });
+    handleAuthCallback()
+      .then((result) => {
+        if (result?.type === "invite" && result.token) {
+          setInviteToken(result.token);
+        } else if (result?.type === "recovery") {
+          window.location.href = "/reset-password";
+        } else if (result?.type === "confirmation" || result?.type === "oauth") {
+          window.location.href = "/admin";
+        }
+      })
+      .catch(() => {
+        window.location.href = "/login";
+      });
   }, []);
 
   const handleAccept = async (e: React.FormEvent) => {
