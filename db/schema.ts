@@ -1,4 +1,16 @@
-import { pgTable, serial, text, timestamp, integer, boolean } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, timestamp, integer, boolean, numeric } from "drizzle-orm/pg-core";
+
+export const fundingRounds = pgTable("funding_rounds", {
+  id: serial().primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  startDate: text("start_date").notNull(),
+  endDate: text("end_date").notNull(),
+  budgetAmount: numeric("budget_amount", { precision: 12, scale: 2 }).notNull(),
+  status: text("status").notNull().default("open"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
 
 export const applications = pgTable("applications", {
   id: serial().primaryKey(),
@@ -34,6 +46,16 @@ export const applications = pgTable("applications", {
   uploadedFiles: text("uploaded_files"),
   status: text("status").notNull().default("submitted"),
   notes: text("notes"),
+  eligible: boolean("eligible").default(false),
+  amountAwarded: integer("amount_awarded"),
+  bankAccountNumber: text("bank_account_number"),
+  bankAccountName: text("bank_account_name"),
+  datePaid: text("date_paid"),
+  accountabilityReportReceived: boolean("accountability_report_received").default(false),
+  postEventFiles: text("post_event_files"),
+  projectOrganisationMethod: text("project_organisation_method"),
+  budgetFile: text("budget_file"),
+  fundingRoundId: integer("funding_round_id").references(() => fundingRounds.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -47,6 +69,26 @@ export const comments = pgTable("comments", {
   authorName: text("author_name").notNull(),
   content: text("content").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const assessments = pgTable("assessments", {
+  id: serial().primaryKey(),
+  applicationId: integer("application_id")
+    .notNull()
+    .references(() => applications.id),
+  reviewerEmail: text("reviewer_email").notNull(),
+  reviewerName: text("reviewer_name").notNull(),
+  alignmentWithMission: integer("alignment_with_mission"),
+  needAndImpact: integer("need_and_impact"),
+  projectDesignAndOrganisation: integer("project_design_and_organisation"),
+  engagementWithOrganisation: integer("engagement_with_organisation"),
+  promotionOfMembership: integer("promotion_of_membership"),
+  budgetAndUseOfFunds: integer("budget_and_use_of_funds"),
+  fundingLeverageOtherGrants: integer("funding_leverage_other_grants"),
+  sustainabilityAndLegacy: integer("sustainability_and_legacy"),
+  comments: text("comments"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const adminUsers = pgTable("admin_users", {

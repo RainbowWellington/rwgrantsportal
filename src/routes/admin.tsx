@@ -18,8 +18,11 @@ import {
   LogOut,
   Menu,
   X,
+  ClipboardCheck,
+  CircleDollarSign,
+  BookOpen,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
 export const Route = createFileRoute("/admin")({
   beforeLoad: async () => {
@@ -43,7 +46,10 @@ export const Route = createFileRoute("/admin")({
 
 const NAV_ITEMS = [
   { to: "/admin" as const, label: "Dashboard", icon: LayoutDashboard, exact: true, adminOnly: false },
+  { to: "/admin/rounds" as const, label: "Funding Rounds", icon: CircleDollarSign, exact: false, adminOnly: false },
   { to: "/admin/applications" as const, label: "Applications", icon: FileText, exact: false, adminOnly: false },
+  { to: "/admin/assessments" as const, label: "Assessments", icon: ClipboardCheck, exact: false, adminOnly: false },
+  { to: "/admin/criteria" as const, label: "Assessment Criteria", icon: BookOpen, exact: false, adminOnly: false },
   { to: "/admin/users" as const, label: "Manage Users", icon: Users, exact: false, adminOnly: true },
 ];
 

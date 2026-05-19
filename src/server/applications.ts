@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { db } from "../../db/index.js";
-import { applications, comments } from "../../db/schema.js";
+import { applications, comments, assessments } from "../../db/schema.js";
 import { eq, desc } from "drizzle-orm";
 import { requireAuthMiddleware } from "../middleware/identity.js";
 import {
@@ -20,6 +20,7 @@ export const submitApplication = createServerFn({ method: "POST" })
       roleInOrganization?: string;
       organizationWebsite?: string;
       projectOrganizer?: string;
+      projectOrganisationMethod?: string;
       projectTitle: string;
       projectDescription: string;
       projectStartDate?: string;
@@ -42,6 +43,7 @@ export const submitApplication = createServerFn({ method: "POST" })
       howDidYouHear?: string;
       additionalInfo?: string;
       uploadedFiles?: string;
+      budgetFile?: string;
     }) => input
   )
   .handler(async ({ data }) => {
@@ -142,13 +144,18 @@ export const getApplicationStats = createServerFn({ method: "GET" })
     const moreInfoNeeded = allApps.filter(
       (a) => a.status === "more_info_needed"
     ).length;
+    const paid = allApps.filter((a) => a.status === "paid").length;
+    const completed = allApps.filter((a) => a.status === "completed").length;
     const totalRequested = allApps.reduce(
       (sum, a) => sum + (a.grantAmountRequested || 0),
       0
     );
     const totalApproved = allApps
-      .filter((a) => a.status === "approved")
+      .filter((a) => a.status === "approved" || a.status === "paid" || a.status === "completed")
       .reduce((sum, a) => sum + (a.grantAmountRequested || 0), 0);
+    const totalAwarded = allApps
+      .filter((a) => a.amountAwarded != null)
+      .reduce((sum, a) => sum + (a.amountAwarded || 0), 0);
 
     return {
       total,
@@ -157,8 +164,11 @@ export const getApplicationStats = createServerFn({ method: "GET" })
       approved,
       declined,
       moreInfoNeeded,
+      paid,
+      completed,
       totalRequested,
       totalApproved,
+      totalAwarded,
     };
   });
 
@@ -175,6 +185,7 @@ export const updateApplication = createServerFn({ method: "POST" })
       roleInOrganization?: string;
       organizationWebsite?: string;
       projectOrganizer?: string;
+      projectOrganisationMethod?: string;
       projectTitle: string;
       projectDescription: string;
       projectStartDate?: string;
@@ -196,6 +207,13 @@ export const updateApplication = createServerFn({ method: "POST" })
       successMeasurement?: string;
       howDidYouHear?: string;
       additionalInfo?: string;
+      notes?: string | null;
+      amountAwarded?: number | null;
+      bankAccountNumber?: string | null;
+      bankAccountName?: string | null;
+      datePaid?: string | null;
+      accountabilityReportReceived?: boolean;
+      postEventFiles?: string | null;
     }) => input
   )
   .handler(async ({ data }) => {
@@ -208,10 +226,35 @@ export const updateApplication = createServerFn({ method: "POST" })
     return updated ?? null;
   });
 
+export const toggleApplicationEligibility = createServerFn({ method: "POST" })
+  .middleware([requireAuthMiddleware])
+  .inputValidator((input: { id: number; eligible: boolean }) => input)
+  .handler(async ({ data }) => {
+    const [updated] = await db
+      .update(applications)
+      .set({ eligible: data.eligible, updatedAt: new Date() })
+      .where(eq(applications.id, data.id))
+      .returning();
+    return updated ?? null;
+  });
+
+export const updateAmountAwarded = createServerFn({ method: "POST" })
+  .middleware([requireAuthMiddleware])
+  .inputValidator((input: { id: number; amountAwarded: number | null }) => input)
+  .handler(async ({ data }) => {
+    const [updated] = await db
+      .update(applications)
+      .set({ amountAwarded: data.amountAwarded, updatedAt: new Date() })
+      .where(eq(applications.id, data.id))
+      .returning();
+    return updated ?? null;
+  });
+
 export const deleteApplication = createServerFn({ method: "POST" })
   .middleware([requireAuthMiddleware])
   .inputValidator((input: { id: number }) => input)
   .handler(async ({ data }) => {
+    await db.delete(assessments).where(eq(assessments.applicationId, data.id));
     await db.delete(comments).where(eq(comments.applicationId, data.id));
     const [deleted] = await db
       .delete(applications)
