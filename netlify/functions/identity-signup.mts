@@ -57,4 +57,18 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
   }
 };
 
-export { handler };
+exports.handler = async function (event, context) {
+  // ... your custom logic (like saving the user to a database) ...
+
+  // 1. Parse the user data that Netlify sent to this function
+  const { user } = JSON.parse(event.body);
+
+  // 2. CRITICAL: You must return a 200 status and the user object back
+  return {
+    statusCode: 200,
+    body: JSON.stringify({
+      ...user,
+      // Optional: You can append custom roles or app_metadata here if you need to
+    }),
+  };
+};
