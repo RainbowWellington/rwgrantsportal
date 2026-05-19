@@ -53,6 +53,8 @@ export const applications = pgTable("applications", {
   datePaid: text("date_paid"),
   accountabilityReportReceived: boolean("accountability_report_received").default(false),
   postEventFiles: text("post_event_files"),
+  signedTermsAndConditions: boolean("signed_terms_and_conditions").default(false),
+  outcomeInformed: boolean("outcome_informed").default(false),
   projectOrganisationMethod: text("project_organisation_method"),
   budgetFile: text("budget_file"),
   fundingRoundId: integer("funding_round_id").references(() => fundingRounds.id),

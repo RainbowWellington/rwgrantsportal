@@ -3,10 +3,11 @@ import {
   getAdminUsers,
   addAdminUser,
   removeAdminUser,
+  updateAdminUser,
 } from "../../server/admin-users.js";
 import { useState, useEffect } from "react";
 import { useIdentity } from "../../lib/identity-context.js";
-import { UserPlus, Trash2, Shield, Mail, Eye, RefreshCw } from "lucide-react";
+import { UserPlus, Trash2, Shield, Mail, Eye, RefreshCw, Pencil, X, Key } from "lucide-react";
 
 export const Route = createFileRoute("/admin/users")({
   beforeLoad: async ({ context }) => {
@@ -28,6 +29,13 @@ function AdminUsersPage() {
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState("");
   const [identityStatus, setIdentityStatus] = useState("");
+  const [editingUser, setEditingUser] = useState<any | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editRole, setEditRole] = useState<"reviewer" | "admin">("reviewer");
+  const [editPassword, setEditPassword] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState("");
 
   const syncIdentityUser = async (
     email: string,
@@ -63,6 +71,75 @@ function AdminUsersPage() {
     const data = await getAdminUsers();
     setUsers(data);
     setLoading(false);
+  };
+
+  const openEditModal = (u: any) => {
+    setEditingUser(u);
+    setEditName(u.name || "");
+    setEditEmail(u.email);
+    setEditRole(u.role === "admin" ? "admin" : "reviewer");
+    setEditPassword("");
+    setEditError("");
+    setIdentityStatus("");
+  };
+
+  const handleEditSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUser) return;
+    setEditSaving(true);
+    setEditError("");
+    setIdentityStatus("");
+
+    try {
+      const emailChanged =
+        editEmail.trim().toLowerCase() !== editingUser.email.toLowerCase();
+      await updateAdminUser({
+        data: {
+          id: editingUser.id,
+          email: emailChanged ? editEmail.trim() : undefined,
+          name: editName.trim() || undefined,
+          role: editRole,
+        },
+      });
+
+      const hasIdentityUpdates =
+        emailChanged || editPassword || editName.trim() !== (editingUser.name || "");
+      if (hasIdentityUpdates) {
+        try {
+          const res = await fetch("/api/manage-identity-user", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: editingUser.email,
+              newEmail: emailChanged ? editEmail.trim() : undefined,
+              name: editName.trim(),
+              password: editPassword || undefined,
+            }),
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            setIdentityStatus(
+              `Portal updated, but Identity sync failed: ${data.error}`
+            );
+          } else {
+            setIdentityStatus("User updated successfully.");
+          }
+        } catch {
+          setIdentityStatus(
+            "Portal updated, but could not sync with Netlify Identity."
+          );
+        }
+      } else {
+        setIdentityStatus("User updated successfully.");
+      }
+
+      setEditingUser(null);
+      await loadUsers();
+    } catch (err: any) {
+      setEditError(err.message || "Failed to update user");
+    } finally {
+      setEditSaving(false);
+    }
   };
 
   useEffect(() => {
@@ -249,13 +326,22 @@ function AdminUsersPage() {
                     </p>
                   </div>
                 </div>
-                <button
-                  onClick={() => handleRemove(u.id, u.email)}
-                  className="text-gray-400 hover:text-red-600 transition-colors p-1"
-                  title="Remove user"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => openEditModal(u)}
+                    className="text-gray-400 hover:text-indigo-600 transition-colors p-1"
+                    title="Edit user"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleRemove(u.id, u.email)}
+                    className="text-gray-400 hover:text-red-600 transition-colors p-1"
+                    title="Remove user"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
@@ -270,6 +356,120 @@ function AdminUsersPage() {
           applications but cannot manage users.
         </p>
       </div>
+
+      {editingUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Edit User</h3>
+              <button
+                onClick={() => setEditingUser(null)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleEditSave} className="p-5 space-y-4">
+              {editError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg p-3">
+                  {editError}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Name
+                </label>
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="Full name"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                  required
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Role
+                </label>
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="editRole"
+                      value="reviewer"
+                      checked={editRole === "reviewer"}
+                      onChange={() => setEditRole("reviewer")}
+                      className="text-indigo-600 focus:ring-indigo-500"
+                    />
+                    Reviewer
+                  </label>
+                  <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="editRole"
+                      value="admin"
+                      checked={editRole === "admin"}
+                      onChange={() => setEditRole("admin")}
+                      className="text-indigo-600 focus:ring-indigo-500"
+                    />
+                    Admin
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1.5">
+                  <Key className="w-3.5 h-3.5" />
+                  New Password
+                </label>
+                <input
+                  type="password"
+                  value={editPassword}
+                  onChange={(e) => setEditPassword(e.target.value)}
+                  placeholder="Leave blank to keep current password"
+                  minLength={8}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Minimum 8 characters. Only fill in if you want to change the password.
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingUser(null)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={editSaving}
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                >
+                  {editSaving ? "Saving..." : "Save Changes"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

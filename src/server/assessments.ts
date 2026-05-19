@@ -3,17 +3,60 @@ import { db } from "../../db/index.js";
 import { assessments, applications, adminUsers } from "../../db/schema.js";
 import { eq, and, desc } from "drizzle-orm";
 import { requireAuthMiddleware } from "../middleware/identity.js";
+import { admin as identityAdmin } from "@netlify/identity";
+
+async function getIdentityNameMap(): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  try {
+    const users = await identityAdmin.listUsers({ perPage: 100 });
+    for (const u of users) {
+      if (u.email && u.name) {
+        map.set(u.email.toLowerCase(), u.name);
+      }
+    }
+  } catch {
+    // Identity admin API may not be available in all contexts
+  }
+  return map;
+}
+
+async function buildNameMap(): Promise<Map<string, string>> {
+  const allAdmins = await db.select().from(adminUsers);
+  const identityNames = await getIdentityNameMap();
+  const map = new Map<string, string>();
+  for (const [email, name] of identityNames) {
+    map.set(email, name);
+  }
+  for (const a of allAdmins) {
+    if (a.name) {
+      map.set(a.email.toLowerCase(), a.name);
+    }
+  }
+  return map;
+}
+
+function resolveNameFromMap(
+  reviewerEmail: string,
+  reviewerName: string | null,
+  nameMap: Map<string, string>
+): string {
+  if (reviewerName && reviewerName !== reviewerEmail) return reviewerName;
+  return nameMap.get(reviewerEmail.toLowerCase()) || reviewerName || reviewerEmail;
+}
 
 async function resolveReviewerName(
   reviewerEmail: string,
   providedName: string
 ): Promise<string> {
   if (providedName && providedName !== reviewerEmail) return providedName;
-  const [admin] = await db
+  const [adminRow] = await db
     .select()
     .from(adminUsers)
     .where(eq(adminUsers.email, reviewerEmail.toLowerCase()));
-  if (admin?.name) return admin.name;
+  if (adminRow?.name) return adminRow.name;
+  const identityNames = await getIdentityNameMap();
+  const identityName = identityNames.get(reviewerEmail.toLowerCase());
+  if (identityName) return identityName;
   return providedName || reviewerEmail;
 }
 
@@ -26,20 +69,10 @@ export const getAssessmentsForApplication = createServerFn({ method: "GET" })
       .from(assessments)
       .where(eq(assessments.applicationId, data.applicationId))
       .orderBy(assessments.reviewerName);
-    const allAdmins = await db.select().from(adminUsers);
-    const adminNameMap = new Map(
-      allAdmins
-        .filter((a) => a.name)
-        .map((a) => [a.email.toLowerCase(), a.name!])
-    );
+    const nameMap = await buildNameMap();
     return rows.map((a) => ({
       ...a,
-      reviewerName:
-        a.reviewerName && a.reviewerName !== a.reviewerEmail
-          ? a.reviewerName
-          : adminNameMap.get(a.reviewerEmail.toLowerCase()) ||
-            a.reviewerName ||
-            a.reviewerEmail,
+      reviewerName: resolveNameFromMap(a.reviewerEmail, a.reviewerName, nameMap),
     }));
   });
 
@@ -82,6 +115,19 @@ export const upsertAssessment = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { applicationId, reviewerEmail, reviewerName: providedName, ...scores } = data;
     const reviewerName = await resolveReviewerName(reviewerEmail, providedName);
+
+    if (reviewerName && reviewerName !== reviewerEmail) {
+      const [admin] = await db
+        .select()
+        .from(adminUsers)
+        .where(eq(adminUsers.email, reviewerEmail.toLowerCase()));
+      if (admin && !admin.name) {
+        await db
+          .update(adminUsers)
+          .set({ name: reviewerName })
+          .where(eq(adminUsers.id, admin.id));
+      }
+    }
 
     const [existing] = await db
       .select()
@@ -129,20 +175,10 @@ export const getAllAssessments = createServerFn({ method: "GET" })
       .select()
       .from(assessments)
       .orderBy(assessments.applicationId, assessments.reviewerName);
-    const allAdmins = await db.select().from(adminUsers);
-    const adminNameMap = new Map(
-      allAdmins
-        .filter((a) => a.name)
-        .map((a) => [a.email.toLowerCase(), a.name!])
-    );
+    const nameMap = await buildNameMap();
     return rows.map((a) => ({
       ...a,
-      reviewerName:
-        a.reviewerName && a.reviewerName !== a.reviewerEmail
-          ? a.reviewerName
-          : adminNameMap.get(a.reviewerEmail.toLowerCase()) ||
-            a.reviewerName ||
-            a.reviewerEmail,
+      reviewerName: resolveNameFromMap(a.reviewerEmail, a.reviewerName, nameMap),
     }));
   });
 
@@ -157,21 +193,11 @@ export const getApplicationsWithAssessments = createServerFn({ method: "GET" })
       .select()
       .from(assessments)
       .orderBy(assessments.reviewerName);
-    const allAdmins = await db.select().from(adminUsers);
-    const adminNameMap = new Map(
-      allAdmins
-        .filter((a) => a.name)
-        .map((a) => [a.email.toLowerCase(), a.name!])
-    );
+    const nameMap = await buildNameMap();
 
     const resolvedAssessments = allAssessments.map((a) => ({
       ...a,
-      reviewerName:
-        a.reviewerName && a.reviewerName !== a.reviewerEmail
-          ? a.reviewerName
-          : adminNameMap.get(a.reviewerEmail.toLowerCase()) ||
-            a.reviewerName ||
-            a.reviewerEmail,
+      reviewerName: resolveNameFromMap(a.reviewerEmail, a.reviewerName, nameMap),
     }));
 
     return allApps.map((app) => ({

@@ -21,6 +21,7 @@ import {
   ClipboardCheck,
   CircleDollarSign,
   BookOpen,
+  TableProperties,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -33,7 +34,7 @@ export const Route = createFileRoute("/admin")({
     const adminCheck = await isUserAdmin({ data: { email: user.email } });
     if (adminCheck.isFirstUser) {
       await autoRegisterFirstAdmin({
-        data: { email: user.email, name: user.name },
+        data: { email: user.email, name: user.name || (user as any).userMetadata?.full_name },
       });
       return { user, role: "admin" as const };
     } else if (!adminCheck.isAdmin) {
@@ -48,6 +49,7 @@ const NAV_ITEMS = [
   { to: "/admin" as const, label: "Dashboard", icon: LayoutDashboard, exact: true, adminOnly: false },
   { to: "/admin/rounds" as const, label: "Funding Rounds", icon: CircleDollarSign, exact: false, adminOnly: false },
   { to: "/admin/applications" as const, label: "Applications", icon: FileText, exact: false, adminOnly: false },
+  { to: "/admin/grants-overview" as const, label: "Grants Overview", icon: TableProperties, exact: false, adminOnly: false },
   { to: "/admin/assessments" as const, label: "Assessments", icon: ClipboardCheck, exact: false, adminOnly: false },
   { to: "/admin/criteria" as const, label: "Assessment Criteria", icon: BookOpen, exact: false, adminOnly: false },
   { to: "/admin/users" as const, label: "Manage Users", icon: Users, exact: false, adminOnly: true },

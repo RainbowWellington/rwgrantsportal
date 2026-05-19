@@ -153,7 +153,7 @@ function ApplicationDetail() {
         applicationId: parseInt(id, 10),
         content: newComment.trim(),
         authorEmail: user?.email || "unknown",
-        authorName: user?.name || user?.email || "Admin",
+        authorName: user?.name || (user as any)?.userMetadata?.full_name || user?.email || "Admin",
       },
     });
     setNewComment("");
@@ -208,6 +208,8 @@ function ApplicationDetail() {
       bankAccountName: application.bankAccountName || "",
       datePaid: application.datePaid || "",
       accountabilityReportReceived: application.accountabilityReportReceived || false,
+      signedTermsAndConditions: application.signedTermsAndConditions || false,
+      outcomeInformed: application.outcomeInformed || false,
     });
     setEditing(true);
   };
@@ -258,6 +260,8 @@ function ApplicationDetail() {
         bankAccountName: editForm.bankAccountName || null,
         datePaid: editForm.datePaid || null,
         accountabilityReportReceived: editForm.accountabilityReportReceived || false,
+        signedTermsAndConditions: editForm.signedTermsAndConditions || false,
+        outcomeInformed: editForm.outcomeInformed || false,
         postEventFiles: postEventFiles.length > 0 ? JSON.stringify(postEventFiles) : null,
       },
     });
@@ -281,7 +285,7 @@ function ApplicationDetail() {
         data: {
           applicationId: parseInt(id, 10),
           reviewerEmail: user.email,
-          reviewerName: user.name || user.email,
+          reviewerName: user.name || (user as any).userMetadata?.full_name || user.email,
           alignmentWithMission: myScores.alignmentWithMission ?? null,
           needAndImpact: myScores.needAndImpact ?? null,
           projectDesignAndOrganisation:
@@ -638,6 +642,24 @@ function ApplicationDetail() {
                   />
                   <span className="text-sm text-gray-700">Accountability Report Received</span>
                 </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editForm.signedTermsAndConditions || false}
+                    onChange={(e) => updateField("signedTermsAndConditions", e.target.checked)}
+                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span className="text-sm text-gray-700">Signed T&Cs</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editForm.outcomeInformed || false}
+                    onChange={(e) => updateField("outcomeInformed", e.target.checked)}
+                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span className="text-sm text-gray-700">Outcome Informed</span>
+                </label>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">
                     Post-Event Files (reports, posters, etc.)
@@ -700,6 +722,18 @@ function ApplicationDetail() {
                   <ClipboardCheck className={`w-4 h-4 ${application.accountabilityReportReceived ? "text-green-600" : "text-gray-300"}`} />
                   <span className="text-sm text-gray-700">
                     Accountability Report: {application.accountabilityReportReceived ? "Received" : "Not received"}
+                  </span>
+                </div>
+                <div className="mt-2 flex items-center gap-2">
+                  <ClipboardCheck className={`w-4 h-4 ${application.signedTermsAndConditions ? "text-green-600" : "text-gray-300"}`} />
+                  <span className="text-sm text-gray-700">
+                    Signed T&Cs: {application.signedTermsAndConditions ? "Yes" : "No"}
+                  </span>
+                </div>
+                <div className="mt-2 flex items-center gap-2">
+                  <ClipboardCheck className={`w-4 h-4 ${application.outcomeInformed ? "text-green-600" : "text-gray-300"}`} />
+                  <span className="text-sm text-gray-700">
+                    Outcome Informed: {application.outcomeInformed ? "Yes" : "No"}
                   </span>
                 </div>
                 {postEventFiles.length > 0 && (

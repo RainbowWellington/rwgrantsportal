@@ -78,6 +78,40 @@ export default async (req: Request, context: Context) => {
     return Response.json({ success: true, message: "Invite sent" });
   }
 
+  if (req.method === "PUT") {
+    const { email, name, password, newEmail } = (await req.json()) as {
+      email: string;
+      name?: string;
+      password?: string;
+      newEmail?: string;
+    };
+
+    const users = await admin.listUsers();
+    const identityUser = users.find(
+      (u) => u.email?.toLowerCase() === email.toLowerCase()
+    );
+
+    if (!identityUser) {
+      return Response.json(
+        { error: "User not found in Identity" },
+        { status: 404 }
+      );
+    }
+
+    const updates: Record<string, unknown> = {};
+    if (newEmail) updates.email = newEmail;
+    if (password) updates.password = password;
+    if (name !== undefined)
+      updates.user_metadata = { full_name: name || "" };
+
+    if (Object.keys(updates).length === 0) {
+      return Response.json({ success: true, message: "Nothing to update" });
+    }
+
+    await admin.updateUser(identityUser.id, updates);
+    return Response.json({ success: true, message: "User updated" });
+  }
+
   if (req.method === "DELETE") {
     const { email } = (await req.json()) as { email: string };
 
