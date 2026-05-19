@@ -56,7 +56,12 @@ function LoginPage() {
       await requestPasswordRecovery(email);
       setRecoverySent(true);
     } catch (err: any) {
-      setError(err.message || "Failed to send recovery email. Please try again.");
+      const msg = err.message || "";
+      if (/rate limit/i.test(msg)) {
+        setError("Too many recovery requests. Please wait a few minutes before trying again.");
+      } else {
+        setError(msg || "Failed to send recovery email. Please try again.");
+      }
     } finally {
       setLoading(false);
     }

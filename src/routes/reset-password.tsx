@@ -67,7 +67,12 @@ function ResetPasswordPage() {
       await updateUser({ password: newPassword });
       setSuccess(true);
     } catch (err: any) {
-      setError(err.message || "Failed to reset password. Please try again.");
+      const msg = err.message || "";
+      if (/rate limit/i.test(msg)) {
+        setError("Too many attempts. Please wait a few minutes before trying again.");
+      } else {
+        setError(msg || "Failed to reset password. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
