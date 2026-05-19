@@ -6,8 +6,16 @@ import {
   deleteApplication,
 } from "../../../server/applications.js";
 import { getComments, addComment } from "../../../server/comments.js";
-import { getFileDownloadUrl } from "../../../server/uploads.js";
+import {
+  getAssessmentsForApplication,
+  upsertAssessment,
+} from "../../../server/assessments.js";
+import { getFundingRounds, assignApplicationToRound } from "../../../server/funding-rounds.js";
+import { getFileDownloadUrl, uploadFile } from "../../../server/uploads.js";
 import { StatusBadge, STATUSES } from "../../../components/StatusBadge.js";
+import {
+  ASSESSMENT_CRITERIA,
+} from "../../../lib/assessment.js";
 import { useState, useEffect } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useIdentity } from "../../../lib/identity-context.js";
@@ -30,6 +38,9 @@ import {
   Pencil,
   X,
   Save,
+  CircleDollarSign,
+  ClipboardCheck,
+  Upload,
 } from "lucide-react";
 
 export const Route = createFileRoute("/admin/applications/$id")({
@@ -45,6 +56,11 @@ function ApplicationDetail() {
   const [loading, setLoading] = useState(true);
   const [newComment, setNewComment] = useState("");
   const [submittingComment, setSubmittingComment] = useState(false);
+  const [assessments, setAssessments] = useState<any[]>([]);
+  const [myScores, setMyScores] = useState<Record<string, number | null>>({});
+  const [assessmentComment, setAssessmentComment] = useState("");
+  const [savingAssessment, setSavingAssessment] = useState(false);
+  const [assessmentMessage, setAssessmentMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -54,14 +70,45 @@ function ApplicationDetail() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editForm, setEditForm] = useState<Record<string, any>>({});
+  const [fundingRounds, setFundingRounds] = useState<any[]>([]);
+  const [assigningRound, setAssigningRound] = useState(false);
+  const [postEventFiles, setPostEventFiles] = useState<
+    { key: string; fileName: string; contentType: string }[]
+  >([]);
+  const [uploadingPostEvent, setUploadingPostEvent] = useState(false);
 
   const loadData = async () => {
-    const [app, cmts] = await Promise.all([
+    const [app, cmts, assmts, rounds] = await Promise.all([
       getApplicationById({ data: { id: parseInt(id, 10) } }),
       getComments({ data: { applicationId: parseInt(id, 10) } }),
+      getAssessmentsForApplication({
+        data: { applicationId: parseInt(id, 10) },
+      }),
+      getFundingRounds(),
     ]);
     setApplication(app);
     setComments(cmts);
+    setAssessments(assmts);
+    setFundingRounds(rounds);
+
+    if (app?.postEventFiles) {
+      try {
+        setPostEventFiles(JSON.parse(app.postEventFiles));
+      } catch {}
+    }
+
+    const myEmail = user?.email?.toLowerCase();
+    const mine = assmts.find(
+      (a: any) => a.reviewerEmail.toLowerCase() === myEmail
+    );
+    if (mine) {
+      const scores: Record<string, number | null> = {};
+      for (const c of ASSESSMENT_CRITERIA) {
+        scores[c.key] = mine[c.key] ?? null;
+      }
+      setMyScores(scores);
+      setAssessmentComment(mine.comments || "");
+    }
     setLoading(false);
   };
 
@@ -133,6 +180,7 @@ function ApplicationDetail() {
       roleInOrganization: application.roleInOrganization || "",
       organizationWebsite: application.organizationWebsite || "",
       projectOrganizer: application.projectOrganizer || "",
+      projectOrganisationMethod: application.projectOrganisationMethod || "",
       projectTitle: application.projectTitle || "",
       projectDescription: application.projectDescription || "",
       projectStartDate: application.projectStartDate || "",
@@ -154,6 +202,12 @@ function ApplicationDetail() {
       successMeasurement: application.successMeasurement || "",
       howDidYouHear: application.howDidYouHear || "",
       additionalInfo: application.additionalInfo || "",
+      notes: application.notes || "",
+      amountAwarded: application.amountAwarded ?? "",
+      bankAccountNumber: application.bankAccountNumber || "",
+      bankAccountName: application.bankAccountName || "",
+      datePaid: application.datePaid || "",
+      accountabilityReportReceived: application.accountabilityReportReceived || false,
     });
     setEditing(true);
   };
@@ -176,6 +230,7 @@ function ApplicationDetail() {
         roleInOrganization: editForm.roleInOrganization || undefined,
         organizationWebsite: editForm.organizationWebsite || undefined,
         projectOrganizer: editForm.projectOrganizer || undefined,
+        projectOrganisationMethod: editForm.projectOrganisationMethod || undefined,
         projectTitle: editForm.projectTitle,
         projectDescription: editForm.projectDescription,
         projectStartDate: editForm.projectStartDate || undefined,
@@ -197,6 +252,13 @@ function ApplicationDetail() {
         successMeasurement: editForm.successMeasurement || undefined,
         howDidYouHear: editForm.howDidYouHear || undefined,
         additionalInfo: editForm.additionalInfo || undefined,
+        notes: editForm.notes || null,
+        amountAwarded: editForm.amountAwarded !== "" ? Number(editForm.amountAwarded) : null,
+        bankAccountNumber: editForm.bankAccountNumber || null,
+        bankAccountName: editForm.bankAccountName || null,
+        datePaid: editForm.datePaid || null,
+        accountabilityReportReceived: editForm.accountabilityReportReceived || false,
+        postEventFiles: postEventFiles.length > 0 ? JSON.stringify(postEventFiles) : null,
       },
     });
     if (updated) {
@@ -208,6 +270,93 @@ function ApplicationDetail() {
 
   const updateField = (field: string, value: any) => {
     setEditForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleSaveAssessment = async () => {
+    if (!user?.email) return;
+    setSavingAssessment(true);
+    setAssessmentMessage(null);
+    try {
+      await upsertAssessment({
+        data: {
+          applicationId: parseInt(id, 10),
+          reviewerEmail: user.email,
+          reviewerName: user.name || user.email,
+          alignmentWithMission: myScores.alignmentWithMission ?? null,
+          needAndImpact: myScores.needAndImpact ?? null,
+          projectDesignAndOrganisation:
+            myScores.projectDesignAndOrganisation ?? null,
+          engagementWithOrganisation:
+            myScores.engagementWithOrganisation ?? null,
+          promotionOfMembership: myScores.promotionOfMembership ?? null,
+          budgetAndUseOfFunds: myScores.budgetAndUseOfFunds ?? null,
+          fundingLeverageOtherGrants:
+            myScores.fundingLeverageOtherGrants ?? null,
+          sustainabilityAndLegacy: myScores.sustainabilityAndLegacy ?? null,
+          comments: assessmentComment || null,
+        },
+      });
+      const assmts = await getAssessmentsForApplication({
+        data: { applicationId: parseInt(id, 10) },
+      });
+      setAssessments(assmts);
+      setAssessmentMessage({ type: "success", text: "Assessment saved successfully." });
+    } catch (err) {
+      console.error("Failed to save assessment:", err);
+      setAssessmentMessage({
+        type: "error",
+        text: err instanceof Error ? err.message : "Failed to save assessment. Please try again.",
+      });
+    } finally {
+      setSavingAssessment(false);
+    }
+  };
+
+  const handleRoundChange = async (roundId: string) => {
+    setAssigningRound(true);
+    const value = roundId === "" ? null : parseInt(roundId, 10);
+    const updated = await assignApplicationToRound({
+      data: { applicationId: parseInt(id, 10), fundingRoundId: value },
+    });
+    if (updated) setApplication(updated);
+    setAssigningRound(false);
+  };
+
+  const handlePostEventUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    setUploadingPostEvent(true);
+
+    try {
+      const newFiles: { key: string; fileName: string; contentType: string }[] = [];
+      for (const file of Array.from(files)) {
+        const buffer = await file.arrayBuffer();
+        const base64Data = btoa(
+          new Uint8Array(buffer).reduce(
+            (data, byte) => data + String.fromCharCode(byte),
+            ""
+          )
+        );
+        const result = await uploadFile({
+          data: {
+            fileName: file.name,
+            contentType: file.type || "application/octet-stream",
+            base64Data,
+          },
+        });
+        newFiles.push(result);
+      }
+      setPostEventFiles((prev) => [...prev, ...newFiles]);
+    } catch (err) {
+      console.error("Upload failed:", err);
+    } finally {
+      setUploadingPostEvent(false);
+      e.target.value = "";
+    }
+  };
+
+  const removePostEventFile = (key: string) => {
+    setPostEventFiles((prev) => prev.filter((f) => f.key !== key));
   };
 
   if (loading) {
@@ -340,25 +489,27 @@ function ApplicationDetail() {
           <InfoSection title="Project Details">
             {editing ? (
               <div className="space-y-3">
-                <EditField label="Project Organiser" value={editForm.projectOrganizer} onChange={(v) => updateField("projectOrganizer", v)} />
                 <EditField label="Project Title" value={editForm.projectTitle} onChange={(v) => updateField("projectTitle", v)} required />
                 <EditTextarea label="Description" value={editForm.projectDescription} onChange={(v) => updateField("projectDescription", v)} required />
+                <EditTextarea label="Project Organiser" value={editForm.projectOrganizer} onChange={(v) => updateField("projectOrganizer", v)} />
+                <EditTextarea label="How is the project being organised?" value={editForm.projectOrganisationMethod} onChange={(v) => updateField("projectOrganisationMethod", v)} />
                 <div className="grid sm:grid-cols-2 gap-3">
                   <EditField label="Start Date" value={editForm.projectStartDate} onChange={(v) => updateField("projectStartDate", v)} type="date" />
                   <EditField label="End Date" value={editForm.projectEndDate} onChange={(v) => updateField("projectEndDate", v)} type="date" />
                 </div>
-                <EditField label="Location" value={editForm.projectLocation} onChange={(v) => updateField("projectLocation", v)} />
+                <EditField label="Project, Event or Activity Location" value={editForm.projectLocation} onChange={(v) => updateField("projectLocation", v)} />
                 <EditTextarea label="Target Audience" value={editForm.targetAudience} onChange={(v) => updateField("targetAudience", v)} />
                 <EditField label="Expected Beneficiaries" value={editForm.expectedBeneficiaries} onChange={(v) => updateField("expectedBeneficiaries", v)} />
               </div>
             ) : (
               <>
-                <TextBlock label="Project Organiser" value={application.projectOrganizer} />
-                <TextBlock label="Description" value={application.projectDescription} className={application.projectOrganizer ? "mt-4" : undefined} />
+                <TextBlock label="Description" value={application.projectDescription} />
+                <TextBlock label="Project Organiser" value={application.projectOrganizer} className="mt-4" />
+                <TextBlock label="How is the project being organised?" value={application.projectOrganisationMethod} className="mt-4" />
                 <InfoGrid className="mt-4">
                   <InfoItem icon={Calendar} label="Start Date" value={application.projectStartDate} />
                   <InfoItem icon={Calendar} label="End Date" value={application.projectEndDate} />
-                  <InfoItem icon={MapPin} label="Location" value={application.projectLocation} />
+                  <InfoItem icon={MapPin} label="Project, Event or Activity Location" value={application.projectLocation} />
                   <InfoItem icon={User} label="Expected Beneficiaries" value={application.expectedBeneficiaries} />
                 </InfoGrid>
                 <TextBlock label="Target Audience" value={application.targetAudience} className="mt-4" />
@@ -402,6 +553,12 @@ function ApplicationDetail() {
                 </InfoGrid>
                 <TextBlock label="Budget Breakdown" value={application.budgetBreakdown} className="mt-4" />
                 <TextBlock label="Other Funding Sources" value={application.otherFundingSources} className="mt-4" />
+                {application.budgetFile && (
+                  <div className="mt-4">
+                    <p className="text-xs text-gray-500 mb-1">Uploaded Budget</p>
+                    <UploadedFilesList filesJson={application.budgetFile} />
+                  </div>
+                )}
                 {application.previousFunding && (
                   <TextBlock label="Previous Funding Details" value={application.previousFundingDetails} className="mt-4" />
                 )}
@@ -455,11 +612,105 @@ function ApplicationDetail() {
             </InfoSection>
           )}
 
-          {application.notes && (
-            <InfoSection title="Admin Notes">
-              <p className="text-sm text-gray-700 whitespace-pre-wrap">{application.notes}</p>
-            </InfoSection>
-          )}
+          <InfoSection title="Admin Notes">
+            {editing ? (
+              <EditTextarea label="Notes" value={editForm.notes} onChange={(v) => updateField("notes", v)} />
+            ) : (
+              application.notes
+                ? <p className="text-sm text-gray-700 whitespace-pre-wrap">{application.notes}</p>
+                : <p className="text-sm text-gray-400">No admin notes.</p>
+            )}
+          </InfoSection>
+
+          <InfoSection title="Grant Administration">
+            {editing ? (
+              <div className="space-y-3">
+                <EditField label="Amount Awarded ($)" value={editForm.amountAwarded} onChange={(v) => updateField("amountAwarded", v)} type="number" />
+                <EditField label="Bank Account Name" value={editForm.bankAccountName} onChange={(v) => updateField("bankAccountName", v)} />
+                <EditField label="Bank Account Number" value={editForm.bankAccountNumber} onChange={(v) => updateField("bankAccountNumber", v)} />
+                <EditField label="Date Paid" value={editForm.datePaid} onChange={(v) => updateField("datePaid", v)} type="date" />
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editForm.accountabilityReportReceived || false}
+                    onChange={(e) => updateField("accountabilityReportReceived", e.target.checked)}
+                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span className="text-sm text-gray-700">Accountability Report Received</span>
+                </label>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">
+                    Post-Event Files (reports, posters, etc.)
+                  </label>
+                  <div className="space-y-2">
+                    {postEventFiles.length > 0 && (
+                      <ul className="space-y-2">
+                        {postEventFiles.map((file) => (
+                          <li
+                            key={file.key}
+                            className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2"
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <FileText className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                              <span className="text-sm text-gray-700 truncate">
+                                {file.fileName}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removePostEventFile(file.key)}
+                              className="text-gray-400 hover:text-red-500 flex-shrink-0 ml-2"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <label className="flex items-center justify-center gap-2 border-2 border-dashed border-gray-300 rounded-lg p-3 cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/50 transition-colors">
+                      <Upload className="w-4 h-4 text-gray-400" />
+                      <span className="text-sm text-gray-600">
+                        {uploadingPostEvent ? "Uploading..." : "Upload files"}
+                      </span>
+                      <input
+                        type="file"
+                        multiple
+                        onChange={handlePostEventUpload}
+                        disabled={uploadingPostEvent}
+                        className="hidden"
+                        accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.gif,.webp,.svg,.csv,.txt,.ppt,.pptx"
+                      />
+                    </label>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <>
+                <InfoGrid>
+                  <InfoItemAlways
+                    icon={DollarSign}
+                    label="Amount Awarded"
+                    value={application.amountAwarded != null ? `$${application.amountAwarded.toLocaleString()}` : null}
+                  />
+                  <InfoItemAlways icon={User} label="Bank Account Name" value={application.bankAccountName} />
+                  <InfoItemAlways icon={Building} label="Bank Account Number" value={application.bankAccountNumber} />
+                  <InfoItemAlways icon={Calendar} label="Date Paid" value={application.datePaid} />
+                </InfoGrid>
+                <div className="mt-3 flex items-center gap-2">
+                  <ClipboardCheck className={`w-4 h-4 ${application.accountabilityReportReceived ? "text-green-600" : "text-gray-300"}`} />
+                  <span className="text-sm text-gray-700">
+                    Accountability Report: {application.accountabilityReportReceived ? "Received" : "Not received"}
+                  </span>
+                </div>
+                {postEventFiles.length > 0 && (
+                  <div className="mt-4">
+                    <p className="text-xs text-gray-500 mb-1">Post-Event Files</p>
+                    <UploadedFilesList filesJson={JSON.stringify(postEventFiles)} />
+                  </div>
+                )}
+              </>
+            )}
+          </InfoSection>
         </div>
 
         <div className="space-y-6">
@@ -485,6 +736,33 @@ function ApplicationDetail() {
                 </button>
               ))}
             </div>
+          </div>
+
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <CircleDollarSign className="w-4 h-4 text-indigo-600" />
+              Funding Round
+            </h3>
+            <select
+              value={application.fundingRoundId ?? ""}
+              onChange={(e) => handleRoundChange(e.target.value)}
+              disabled={assigningRound}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none bg-white disabled:opacity-50"
+            >
+              <option value="">Not assigned</option>
+              {fundingRounds.map((r) => (
+                <option key={r.id} value={String(r.id)}>{r.name}</option>
+              ))}
+            </select>
+            {application.fundingRoundId && (
+              <Link
+                to="/admin/rounds/$id"
+                params={{ id: String(application.fundingRoundId) }}
+                className="text-xs text-indigo-600 hover:text-indigo-800 mt-2 inline-block"
+              >
+                View round details →
+              </Link>
+            )}
           </div>
 
           <div className="bg-white rounded-xl border border-gray-200 p-5">
@@ -543,6 +821,146 @@ function ApplicationDetail() {
             </form>
           </div>
         </div>
+      </div>
+
+      <div className="mt-6 space-y-6">
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <h2 className="text-sm font-semibold text-gray-900 mb-4 uppercase tracking-wide">
+            My Assessment
+          </h2>
+
+          <div className="grid sm:grid-cols-2 gap-4 mb-5">
+            <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+              <h3 className="text-xs font-semibold text-indigo-800 uppercase tracking-wide mb-2">
+                How Scoring Works
+              </h3>
+              <ul className="text-xs text-indigo-700 space-y-1">
+                <li>Enter <strong>0&ndash;5</strong> for each criterion below</li>
+                <li>Weights are already set per criterion</li>
+                <li>Maximum possible score = <strong>500</strong></li>
+                <li>Percentage normalises your score to <strong>100%</strong></li>
+              </ul>
+            </div>
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+              <h3 className="text-xs font-semibold text-amber-800 uppercase tracking-wide mb-2">
+                Notes for Reviewers
+              </h3>
+              <ol className="text-xs text-amber-800 space-y-1.5 list-decimal list-outside ml-3.5">
+                <li><strong>Alignment with RW&rsquo;s Constitution &amp; Purpose:</strong> Projects must clearly benefit Rainbow communities in the Wellington region and align with RW&rsquo;s role as a membership association and registered charity focused on support, advocacy and community connection.</li>
+                <li><strong>Community Benefit:</strong> Prioritise projects that reach many members, address identified gaps, or enhance wellbeing, visibility, inclusion, safety or capability for Rainbow people.</li>
+                <li><strong>Engagement &amp; Membership:</strong> Projects that actively involve RW or promote membership growth should be rewarded in scoring.</li>
+                <li><strong>Budget Justification:</strong> Be strict on ineligible costs &mdash; only award points when applicants clearly and convincingly justify discretionary items (like food/travel) or non-standard expenses.</li>
+              </ol>
+            </div>
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-4 mb-4">
+            {ASSESSMENT_CRITERIA.map((criterion) => (
+              <div key={criterion.key}>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  {criterion.label}{" "}
+                  <span className="text-gray-400">(Weight: {criterion.weight})</span>
+                </label>
+                <select
+                  value={myScores[criterion.key] ?? ""}
+                  onChange={(e) => {
+                    const val = e.target.value === "" ? null : parseInt(e.target.value, 10);
+                    setMyScores((prev) => ({ ...prev, [criterion.key]: val }));
+                  }}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none bg-white"
+                >
+                  <option value="">Not scored</option>
+                  {[0, 1, 2, 3, 4, 5].map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ))}
+          </div>
+          <div className="mb-4">
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Assessment Comments
+            </label>
+            <textarea
+              value={assessmentComment}
+              onChange={(e) => setAssessmentComment(e.target.value)}
+              placeholder="Optional comments about this assessment..."
+              rows={3}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none resize-none"
+            />
+          </div>
+          <button
+            onClick={handleSaveAssessment}
+            disabled={savingAssessment}
+            className="inline-flex items-center gap-2 bg-indigo-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+          >
+            <Save className="w-4 h-4" />
+            {savingAssessment ? "Saving..." : "Save Assessment"}
+          </button>
+          {assessmentMessage && (
+            <p className={`mt-2 text-sm ${assessmentMessage.type === "success" ? "text-green-600" : "text-red-600"}`}>
+              {assessmentMessage.text}
+            </p>
+          )}
+        </div>
+
+        {assessments.length > 0 && (
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <h2 className="text-sm font-semibold text-gray-900 mb-4 uppercase tracking-wide">
+              All Reviewer Scores
+            </h2>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="text-left px-3 py-2 font-medium text-gray-600">
+                      Criterion
+                    </th>
+                    {assessments.map((a: any) => (
+                      <th
+                        key={a.id}
+                        className="text-center px-3 py-2 font-medium text-gray-600"
+                      >
+                        {a.reviewerName}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {ASSESSMENT_CRITERIA.map((criterion) => (
+                    <tr key={criterion.key}>
+                      <td className="px-3 py-2 text-gray-700">
+                        {criterion.label}
+                        <span className="text-gray-400 ml-1 text-xs">
+                          (x{criterion.weight})
+                        </span>
+                      </td>
+                      {assessments.map((a: any) => {
+                        const score = a[criterion.key];
+                        return (
+                          <td
+                            key={a.id}
+                            className="px-3 py-2 text-center"
+                          >
+                            {score != null ? (
+                              <span className="font-medium text-gray-900">
+                                {score}
+                              </span>
+                            ) : (
+                              <span className="text-gray-300">—</span>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
 
       {pendingStatus && (
@@ -698,6 +1116,26 @@ function InfoItem({
       <div>
         <p className="text-xs text-gray-500">{label}</p>
         <p className="text-sm text-gray-900">{value}</p>
+      </div>
+    </div>
+  );
+}
+
+function InfoItemAlways({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: any;
+  label: string;
+  value: string | null | undefined;
+}) {
+  return (
+    <div className="flex items-start gap-2">
+      <Icon className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+      <div>
+        <p className="text-xs text-gray-500">{label}</p>
+        <p className={`text-sm ${value ? "text-gray-900" : "text-gray-300"}`}>{value || "—"}</p>
       </div>
     </div>
   );

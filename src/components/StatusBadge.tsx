@@ -8,16 +8,26 @@ const STATUS_CONFIG: Record<
     bg: "bg-yellow-100",
     text: "text-yellow-800",
   },
+  more_info_needed: {
+    label: "More Info Needed",
+    bg: "bg-orange-100",
+    text: "text-orange-800",
+  },
+  declined: { label: "Declined", bg: "bg-red-100", text: "text-red-800" },
   approved: {
     label: "Approved",
     bg: "bg-green-100",
     text: "text-green-800",
   },
-  declined: { label: "Declined", bg: "bg-red-100", text: "text-red-800" },
-  more_info_needed: {
-    label: "More Info Needed",
-    bg: "bg-orange-100",
-    text: "text-orange-800",
+  paid: {
+    label: "Paid",
+    bg: "bg-emerald-100",
+    text: "text-emerald-800",
+  },
+  completed: {
+    label: "Completed",
+    bg: "bg-purple-100",
+    text: "text-purple-800",
   },
 };
 
@@ -35,7 +45,9 @@ export function StatusBadge({ status }: { status: string }) {
 export const STATUSES = [
   { value: "submitted", label: "Submitted" },
   { value: "under_review", label: "Under Review" },
-  { value: "approved", label: "Approved" },
-  { value: "declined", label: "Declined" },
   { value: "more_info_needed", label: "More Info Needed" },
+  { value: "declined", label: "Declined" },
+  { value: "approved", label: "Approved" },
+  { value: "paid", label: "Paid" },
+  { value: "completed", label: "Completed" },
 ];

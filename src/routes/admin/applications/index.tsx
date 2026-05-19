@@ -1,8 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { getApplications } from "../../../server/applications.js";
+import { getFundingRounds } from "../../../server/funding-rounds.js";
 import { useState, useEffect } from "react";
 import { StatusBadge, STATUSES } from "../../../components/StatusBadge.js";
-import { Search, Eye, Calendar, DollarSign } from "lucide-react";
+import { Search, Eye, Calendar, DollarSign, CircleDollarSign } from "lucide-react";
 
 export const Route = createFileRoute("/admin/applications/")({
   component: ApplicationsList,
@@ -10,26 +11,38 @@ export const Route = createFileRoute("/admin/applications/")({
 
 function ApplicationsList() {
   const [applications, setApplications] = useState<any[]>([]);
+  const [rounds, setRounds] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
+  const [roundFilter, setRoundFilter] = useState("");
   const [search, setSearch] = useState("");
 
   useEffect(() => {
-    getApplications().then((data) => {
-      setApplications(data);
+    Promise.all([getApplications(), getFundingRounds()]).then(([apps, rds]) => {
+      setApplications(apps);
+      setRounds(rds);
+      if (rds.length > 0) {
+        setRoundFilter(String(rds[0].id));
+      } else {
+        setRoundFilter("unassigned");
+      }
       setLoading(false);
     });
   }, []);
 
+  const roundMap = new Map(rounds.map((r) => [r.id, r.name]));
+
   const filtered = applications.filter((app) => {
     const matchesFilter = filter === "all" || app.status === filter;
+    const matchesRound =
+      roundFilter === "unassigned" ? !app.fundingRoundId : String(app.fundingRoundId) === roundFilter;
     const matchesSearch =
       !search ||
       app.fullName.toLowerCase().includes(search.toLowerCase()) ||
       app.projectTitle.toLowerCase().includes(search.toLowerCase()) ||
       app.email.toLowerCase().includes(search.toLowerCase()) ||
       (app.organizationName || "").toLowerCase().includes(search.toLowerCase());
-    return matchesFilter && matchesSearch;
+    return matchesFilter && matchesRound && matchesSearch;
   });
 
   if (loading) {
@@ -66,6 +79,16 @@ function ApplicationsList() {
               <option key={s.value} value={s.value}>
                 {s.label}
               </option>
+            ))}
+          </select>
+          <select
+            value={roundFilter}
+            onChange={(e) => setRoundFilter(e.target.value)}
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm bg-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+          >
+            <option value="unassigned">Unassigned</option>
+            {rounds.map((r) => (
+              <option key={r.id} value={String(r.id)}>{r.name}</option>
             ))}
           </select>
         </div>
@@ -105,6 +128,12 @@ function ApplicationsList() {
                       <Calendar className="w-3 h-3" />
                       {new Date(app.createdAt).toLocaleDateString()}
                     </span>
+                    {app.fundingRoundId && roundMap.has(app.fundingRoundId) && (
+                      <span className="flex items-center gap-1 text-indigo-600">
+                        <CircleDollarSign className="w-3 h-3" />
+                        {roundMap.get(app.fundingRoundId)}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <Eye className="w-4 h-4 text-gray-400 mt-1 flex-shrink-0" />

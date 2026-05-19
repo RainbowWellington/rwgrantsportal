@@ -35,6 +35,11 @@ function ApplyPage() {
     { key: string; fileName: string; contentType: string }[]
   >([]);
   const [uploading, setUploading] = useState(false);
+  const [budgetFiles, setBudgetFiles] = useState<
+    { key: string; fileName: string; contentType: string }[]
+  >([]);
+  const [uploadingBudget, setUploadingBudget] = useState(false);
+  const [amountRequested, setAmountRequested] = useState(0);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -74,6 +79,44 @@ function ApplyPage() {
     setUploadedFiles((prev) => prev.filter((f) => f.key !== key));
   };
 
+  const handleBudgetUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    setUploadingBudget(true);
+    setError("");
+
+    try {
+      const newFiles: { key: string; fileName: string; contentType: string }[] = [];
+      for (const file of Array.from(files)) {
+        const buffer = await file.arrayBuffer();
+        const base64Data = btoa(
+          new Uint8Array(buffer).reduce(
+            (data, byte) => data + String.fromCharCode(byte),
+            ""
+          )
+        );
+        const result = await uploadFile({
+          data: {
+            fileName: file.name,
+            contentType: file.type || "application/octet-stream",
+            base64Data,
+          },
+        });
+        newFiles.push(result);
+      }
+      setBudgetFiles((prev) => [...prev, ...newFiles]);
+    } catch (err: any) {
+      setError(err.message || "Failed to upload budget file. Please try again.");
+    } finally {
+      setUploadingBudget(false);
+      e.target.value = "";
+    }
+  };
+
+  const removeBudgetFile = (key: string) => {
+    setBudgetFiles((prev) => prev.filter((f) => f.key !== key));
+  };
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSubmitting(true);
@@ -98,6 +141,8 @@ function ApplyPage() {
             (fd.get("organizationWebsite") as string) || undefined,
           projectOrganizer:
             (fd.get("projectOrganizer") as string) || undefined,
+          projectOrganisationMethod:
+            (fd.get("projectOrganisationMethod") as string) || undefined,
           projectTitle: fd.get("projectTitle") as string,
           projectDescription: fd.get("projectDescription") as string,
           projectStartDate:
@@ -135,6 +180,10 @@ function ApplyPage() {
           uploadedFiles:
             uploadedFiles.length > 0
               ? JSON.stringify(uploadedFiles)
+              : undefined,
+          budgetFile:
+            budgetFiles.length > 0
+              ? JSON.stringify(budgetFiles)
               : undefined,
         },
       });
@@ -230,17 +279,23 @@ function ApplyPage() {
                 className="sm:col-span-2"
               />
               <TextareaField
+                label="Project Description"
+                name="projectDescription"
+                required
+                className="sm:col-span-2"
+                placeholder="Describe your project or event, its goals, and who it serves..."
+              />
+              <TextareaField
                 label="Who is organising the project or event?"
                 name="projectOrganizer"
                 className="sm:col-span-2"
                 placeholder="Describe who is responsible for organising this project or event..."
               />
               <TextareaField
-                label="Project Description"
-                name="projectDescription"
-                required
+                label="How is the project being organised?"
+                name="projectOrganisationMethod"
                 className="sm:col-span-2"
-                placeholder="Describe your project or event, its goals, and who it serves..."
+                placeholder="Describe how the project or event is being organised..."
               />
               <Field
                 label="Start Date"
@@ -249,7 +304,7 @@ function ApplyPage() {
               />
               <Field label="End Date" name="projectEndDate" type="date" />
               <Field
-                label="Location"
+                label="Project, Event or Activity Location"
                 name="projectLocation"
                 className="sm:col-span-2"
               />
@@ -274,6 +329,7 @@ function ApplyPage() {
                 type="number"
                 required
                 min="1"
+                onChange={(v) => setAmountRequested(parseInt(v, 10) || 0)}
               />
               <Field
                 label="Total Project Budget ($)"
@@ -281,6 +337,65 @@ function ApplyPage() {
                 type="number"
                 min="0"
               />
+              {amountRequested >= 500 && (
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Please upload your project or activity budget
+                    <span className="text-red-500 ml-1">*</span>
+                  </label>
+                  <div className="space-y-3">
+                    {budgetFiles.length > 0 && (
+                      <ul className="space-y-2">
+                        {budgetFiles.map((file) => (
+                          <li
+                            key={file.key}
+                            className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2"
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <FileText className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                              <span className="text-sm text-gray-700 truncate">
+                                {file.fileName}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeBudgetFile(file.key)}
+                              className="text-gray-400 hover:text-red-500 flex-shrink-0 ml-2"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <label className="flex items-center justify-center gap-2 border-2 border-dashed border-gray-300 rounded-lg p-4 cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/50 transition-colors">
+                      <Upload className="w-5 h-5 text-gray-400" />
+                      <span className="text-sm text-gray-600">
+                        {uploadingBudget ? "Uploading..." : "Click to upload budget file"}
+                      </span>
+                      <input
+                        type="file"
+                        multiple
+                        onChange={handleBudgetUpload}
+                        disabled={uploadingBudget}
+                        className="hidden"
+                        accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.csv,.txt"
+                      />
+                    </label>
+                    {budgetFiles.length === 0 && (
+                      <input
+                        type="text"
+                        required
+                        className="sr-only"
+                        tabIndex={-1}
+                        value=""
+                        onChange={() => {}}
+                        aria-hidden="true"
+                      />
+                    )}
+                  </div>
+                </div>
+              )}
               <TextareaField
                 label="Budget Breakdown"
                 name="budgetBreakdown"
@@ -441,7 +556,7 @@ function ApplyPage() {
 
           <button
             type="submit"
-            disabled={submitting || uploading}
+            disabled={submitting || uploading || uploadingBudget}
             className="w-full flex items-center justify-center gap-2 bg-indigo-600 text-white font-medium py-3 px-6 rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {submitting ? (
@@ -485,6 +600,7 @@ function Field({
   placeholder,
   className,
   min,
+  onChange,
 }: {
   label: string;
   name: string;
@@ -493,6 +609,7 @@ function Field({
   placeholder?: string;
   className?: string;
   min?: string;
+  onChange?: (value: string) => void;
 }) {
   return (
     <div className={className}>
@@ -506,6 +623,7 @@ function Field({
         required={required}
         placeholder={placeholder}
         min={min}
+        onChange={onChange ? (e) => onChange(e.target.value) : undefined}
         className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-colors"
       />
     </div>
