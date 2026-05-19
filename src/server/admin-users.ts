@@ -40,6 +40,30 @@ export const addAdminUser = createServerFn({ method: "POST" })
     return user;
   });
 
+export const updateAdminUser = createServerFn({ method: "POST" })
+  .middleware([requireAdminRoleMiddleware])
+  .inputValidator(
+    (input: { id: number; email?: string; name?: string; role?: string }) => {
+      const validRoles = ["admin", "reviewer"];
+      if (input.role && !validRoles.includes(input.role)) {
+        throw new Error("Invalid role. Must be 'admin' or 'reviewer'.");
+      }
+      return input;
+    }
+  )
+  .handler(async ({ data }) => {
+    const updates: Record<string, unknown> = {};
+    if (data.email !== undefined) updates.email = data.email.toLowerCase();
+    if (data.name !== undefined) updates.name = data.name || null;
+    if (data.role !== undefined) updates.role = data.role;
+    const [updated] = await db
+      .update(adminUsers)
+      .set(updates)
+      .where(eq(adminUsers.id, data.id))
+      .returning();
+    return updated;
+  });
+
 export const removeAdminUser = createServerFn({ method: "POST" })
   .middleware([requireAdminRoleMiddleware])
   .inputValidator((input: { id: number }) => input)

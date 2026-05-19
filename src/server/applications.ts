@@ -214,6 +214,8 @@ export const updateApplication = createServerFn({ method: "POST" })
       datePaid?: string | null;
       accountabilityReportReceived?: boolean;
       postEventFiles?: string | null;
+      signedTermsAndConditions?: boolean;
+      outcomeInformed?: boolean;
     }) => input
   )
   .handler(async ({ data }) => {
