@@ -1,6 +1,5 @@
 import { createMiddleware } from '@tanstack/react-start'
-import { getAuth, clerkMiddleware } from '@clerk/tanstack-react-start/server'
-import { getWebRequest } from '@tanstack/react-start/server'
+import { auth, clerkMiddleware } from '@clerk/tanstack-react-start/server'
 import { db } from '../../db/index.js'
 import { adminUsers } from '../../db/schema.js'
 import { eq } from 'drizzle-orm'
@@ -8,8 +7,7 @@ import { eq } from 'drizzle-orm'
 export const identityMiddleware = clerkMiddleware()
 
 export const requireAuthMiddleware = createMiddleware().server(async ({ next }) => {
-  const request = getWebRequest()
-  const { userId } = await getAuth(request)
+  const { userId } = await auth()
 
   if (!userId) {
     throw new Response('Unauthorized', { status: 401 })
