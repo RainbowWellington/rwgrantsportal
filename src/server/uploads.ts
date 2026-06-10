@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { put, head, get } from "@vercel/blob";
+import { put, head } from "@vercel/blob";
 
 export const uploadFile = createServerFn({ method: "POST" })
   .inputValidator(
@@ -22,8 +22,8 @@ export const getFileDownloadUrl = createServerFn({ method: "GET" })
     try {
       const meta = await head(data.key);
       if (!meta) return null;
-      const response = await get(data.key);
-      const buffer = await response.arrayBuffer()
+      const response = await fetch(meta.url);
+      const buffer = await response.arrayBuffer();
       const base64 = Buffer.from(buffer).toString("base64");
       return {
         base64Data: base64,
