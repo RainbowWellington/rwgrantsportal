@@ -1,7 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getStore } from "@netlify/blobs";
-
-const STORE_NAME = "application-uploads";
+import { put, head, get } from "@vercel/blob";
 
 export const uploadFile = createServerFn({ method: "POST" })
   .inputValidator(
@@ -9,14 +7,11 @@ export const uploadFile = createServerFn({ method: "POST" })
       input
   )
   .handler(async ({ data }) => {
-    const store = getStore(STORE_NAME);
     const key = `${Date.now()}-${Math.random().toString(36).slice(2)}-${data.fileName}`;
     const buffer = Buffer.from(data.base64Data, "base64");
-    await store.set(key, buffer, {
-      metadata: {
-        contentType: data.contentType,
-        originalName: data.fileName,
-      },
+    await put(key, buffer, {
+      access: "public",
+      contentType: data.contentType,
     });
     return { key, fileName: data.fileName, contentType: data.contentType };
   });
@@ -24,15 +19,18 @@ export const uploadFile = createServerFn({ method: "POST" })
 export const getFileDownloadUrl = createServerFn({ method: "GET" })
   .inputValidator((input: { key: string }) => input)
   .handler(async ({ data }) => {
-    const store = getStore(STORE_NAME);
-    const meta = await store.getMetadata(data.key);
-    if (!meta) return null;
-    const blob = await store.get(data.key, { type: "arrayBuffer" });
-    if (!blob) return null;
-    const base64 = Buffer.from(blob).toString("base64");
-    return {
-      base64Data: base64,
-      contentType: meta.metadata.contentType || "application/octet-stream",
-      fileName: meta.metadata.originalName || data.key,
-    };
+    try {
+      const meta = await head(data.key);
+      if (!meta) return null;
+      const response = await get(data.key);
+      const buffer = await response.arrayBuffer()
+      const base64 = Buffer.from(buffer).toString("base64");
+      return {
+        base64Data: base64,
+        contentType: meta.contentType || "application/octet-stream",
+        fileName: data.key.split("-").slice(3).join("-"),
+      };
+    } catch {
+      return null;
+    }
   });
