@@ -7,17 +7,12 @@ import { nitro } from 'nitro/vite'
 
 const config = defineConfig({
   plugins: [
-    viteTsConfigPaths({
-      projects: ['./tsconfig.json'],
-    }),
+    viteTsConfigPaths({ projects: ['./tsconfig.json'] }),
     tailwindcss(),
     nitro(),
     tanstackStart(),
     viteReact(),
   ],
-  define: {
-    'process.env.POSTGRES_URL': JSON.stringify(process.env.POSTGRES_URL),
-  },
 })
 
 export default config
