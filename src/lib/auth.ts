@@ -1,5 +1,4 @@
-import { getAuth } from '@clerk/tanstack-react-start/server'
-import { getWebRequest } from '@tanstack/react-start/server'
+import { auth } from '@clerk/tanstack-react-start/server'
 
 export type ServerUser = {
   id: string
@@ -8,8 +7,7 @@ export type ServerUser = {
 }
 
 export async function getServerUser(): Promise<ServerUser | null> {
-  const request = getWebRequest()
-  const { userId } = await getAuth(request)
+  const { userId } = await auth()
 
   if (!userId) return null
 
