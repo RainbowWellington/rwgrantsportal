@@ -15,6 +15,9 @@ const config = defineConfig({
     tanstackStart(),
     viteReact(),
   ],
+  define: {
+    'process.env.POSTGRES_URL': JSON.stringify(process.env.POSTGRES_URL),
+  },
 })
 
 export default config
