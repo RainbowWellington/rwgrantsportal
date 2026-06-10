@@ -1,1 +1,0 @@
-ALTER TABLE "applications" ADD COLUMN "eligible" boolean DEFAULT false;
