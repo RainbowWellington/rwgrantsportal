@@ -4,8 +4,7 @@ import {
   Scripts,
   createRootRoute,
 } from "@tanstack/react-router";
-import { IdentityProvider } from "../lib/identity-context.js";
-import { CallbackHandler } from "../components/CallbackHandler.js";
+import { ClerkProvider } from '@clerk/tanstack-react-start'
 
 import "../styles.css";
 
@@ -26,11 +25,9 @@ export const Route = createRootRoute({
   }),
   shellComponent: RootDocument,
   component: () => (
-    <IdentityProvider>
-      <CallbackHandler>
-        <Outlet />
-      </CallbackHandler>
-    </IdentityProvider>
+    <ClerkProvider publishableKey={import.meta.env.VITE_CLERK_PUBLISHABLE_KEY}>
+            <Outlet />
+    </ClerkProvider>
   ),
 });
 
