@@ -1,7 +1,6 @@
 {
   "buildCommand": "vite build",
-  "outputDirectory": ".vercel/output",
-  "framework": null,
+  "outputDirectory": ".output/public",
   "headers": [
     {
       "source": "/apply",
