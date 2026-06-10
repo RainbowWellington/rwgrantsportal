@@ -1,6 +1,4 @@
 {
-  "buildCommand": "vite build",
-  "outputDirectory": ".output/public",
   "headers": [
     {
       "source": "/apply",
