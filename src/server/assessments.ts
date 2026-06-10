@@ -65,4 +65,122 @@ export const getAssessmentByReviewer = createServerFn({ method: "GET" })
       .where(
         and(
           eq(assessments.applicationId, data.applicationId),
-          eq(assessments.reviewe
+          eq(assessments.reviewerEmail, data.reviewerEmail)
+        )
+      );
+    return row ?? null;
+  });
+
+export const upsertAssessment = createServerFn({ method: "POST" })
+  .middleware([requireAuthMiddleware])
+  .inputValidator(
+    (input: {
+      applicationId: number;
+      reviewerEmail: string;
+      reviewerName: string;
+      alignmentWithMission?: number | null;
+      needAndImpact?: number | null;
+      projectDesignAndOrganisation?: number | null;
+      engagementWithOrganisation?: number | null;
+      promotionOfMembership?: number | null;
+      budgetAndUseOfFunds?: number | null;
+      fundingLeverageOtherGrants?: number | null;
+      sustainabilityAndLegacy?: number | null;
+      comments?: string | null;
+    }) => input
+  )
+  .handler(async ({ data }) => {
+    const { applicationId, reviewerEmail, reviewerName: providedName, ...scores } = data;
+    const reviewerName = await resolveReviewerName(reviewerEmail, providedName);
+
+    if (reviewerName && reviewerName !== reviewerEmail) {
+      const [admin] = await db
+        .select()
+        .from(adminUsers)
+        .where(eq(adminUsers.email, reviewerEmail.toLowerCase()));
+      if (admin && !admin.name) {
+        await db
+          .update(adminUsers)
+          .set({ name: reviewerName })
+          .where(eq(adminUsers.id, admin.id));
+      }
+    }
+
+    const [existing] = await db
+      .select()
+      .from(assessments)
+      .where(
+        and(
+          eq(assessments.applicationId, applicationId),
+          eq(assessments.reviewerEmail, reviewerEmail)
+        )
+      );
+
+    if (existing) {
+      const [updated] = await db
+        .update(assessments)
+        .set({ ...scores, reviewerName, updatedAt: new Date() })
+        .where(eq(assessments.id, existing.id))
+        .returning();
+      return updated;
+    }
+
+    const [created] = await db
+      .insert(assessments)
+      .values({
+        applicationId,
+        reviewerEmail,
+        reviewerName,
+        ...scores,
+      })
+      .returning();
+    return created;
+  });
+
+export const deleteAssessment = createServerFn({ method: "POST" })
+  .middleware([requireAuthMiddleware])
+  .inputValidator((input: { id: number }) => input)
+  .handler(async ({ data }) => {
+    await db.delete(assessments).where(eq(assessments.id, data.id));
+    return { success: true };
+  });
+
+export const getAllAssessments = createServerFn({ method: "GET" })
+  .middleware([requireAuthMiddleware])
+  .handler(async () => {
+    const rows = await db
+      .select()
+      .from(assessments)
+      .orderBy(assessments.applicationId, assessments.reviewerName);
+    const nameMap = await buildNameMap();
+    return rows.map((a) => ({
+      ...a,
+      reviewerName: resolveNameFromMap(a.reviewerEmail, a.reviewerName, nameMap),
+    }));
+  });
+
+export const getApplicationsWithAssessments = createServerFn({ method: "GET" })
+  .middleware([requireAuthMiddleware])
+  .handler(async () => {
+    const allApps = await db
+      .select()
+      .from(applications)
+      .orderBy(desc(applications.createdAt));
+    const allAssessments = await db
+      .select()
+      .from(assessments)
+      .orderBy(assessments.reviewerName);
+    const nameMap = await buildNameMap();
+
+    const resolvedAssessments = allAssessments.map((a) => ({
+      ...a,
+      reviewerName: resolveNameFromMap(a.reviewerEmail, a.reviewerName, nameMap),
+    }));
+
+    return allApps.map((app) => ({
+      ...app,
+      assessments: resolvedAssessments.filter(
+        (a) => a.applicationId === app.id
+      ),
+    }));
+  });
