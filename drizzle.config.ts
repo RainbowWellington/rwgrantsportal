@@ -1,7 +1,10 @@
-import { defineConfig } from "drizzle-kit";
+import { defineConfig } from 'drizzle-kit'
 
 export default defineConfig({
-  dialect: "postgresql",
-  schema: "./db/schema.ts",
-  out: "netlify/database/migrations",
-});
+  schema: './db/schema.ts',
+  out: './drizzle/migrations', // moved out of netlify/ folder
+  dialect: 'postgresql',
+  dbCredentials: {
+    url: process.env.POSTGRES_URL!,
+  },
+})

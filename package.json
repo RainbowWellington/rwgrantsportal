@@ -4,12 +4,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev --port 3000",
-    "build": "vite build"
+    "build": "vite build",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate"
   },
   "dependencies": {
-    "@netlify/blobs": "^10.7.7",
-    "@netlify/database": "^1.0.0",
-    "@netlify/identity": "^1.1.0",
+    "@vercel/blob": "^0.27.0",
+    "@vercel/postgres": "^0.10.0",
+    "@clerk/tanstack-start": "^0.14.0",
     "@tailwindcss/vite": "4.2.2",
     "@tanstack/react-router": "1.168.22",
     "@tanstack/react-start": "1.167.41",
@@ -26,7 +28,6 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
-    "@netlify/vite-plugin-tanstack-start": "1.3.13",
     "@tailwindcss/vite": "4.2.2",
     "@types/node": "22.19.17",
     "@types/react": "19.2.14",
