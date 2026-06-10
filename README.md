@@ -24,7 +24,7 @@ A web application for managing community grant applications. Features a public-f
 - **Authentication** — Netlify Identity with email/password and OAuth (Google, GitHub). Microsoft/O365 SSO can be configured as an external OAuth provider in Netlify Identity settings.
 
 ## Running Locally
-jkj
+jkj4
 
 ```bash
 npm install
