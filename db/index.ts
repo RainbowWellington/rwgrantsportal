@@ -2,12 +2,10 @@ import { drizzle } from 'drizzle-orm/neon-http'
 import { neon } from '@neondatabase/serverless'
 import * as schema from './schema.js'
 
-const connectionString = process.env.POSTGRES_URL 
-  || process.env.DATABASE_URL
-  || process.env.POSTGRES_PRISMA_URL
+const connectionString = process.env.NITRO_POSTGRES_URL || process.env.POSTGRES_URL
 
 if (!connectionString) {
-  throw new Error('No database connection string found. Set POSTGRES_URL in environment variables.')
+  throw new Error('No database connection string found.')
 }
 
 const sql = neon(connectionString)
