@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { db } from "../../db/index.js";
+import { getDatabase } from "../../db/index.js";
 import { fundingRounds, applications } from "../../db/schema.js";
 import { eq, desc } from "drizzle-orm";
 import { requireAuthMiddleware } from "../middleware/identity.js";
@@ -7,6 +7,7 @@ import { requireAuthMiddleware } from "../middleware/identity.js";
 export const getFundingRounds = createServerFn({ method: "GET" })
   .middleware([requireAuthMiddleware])
   .handler(async () => {
+    const db = getDatabase()
     const rows = await db
       .select()
       .from(fundingRounds)
@@ -18,6 +19,7 @@ export const getFundingRoundById = createServerFn({ method: "GET" })
   .middleware([requireAuthMiddleware])
   .inputValidator((input: { id: number }) => input)
   .handler(async ({ data }) => {
+    const db = getDatabase()
     const [round] = await db
       .select()
       .from(fundingRounds)
@@ -37,6 +39,7 @@ export const createFundingRound = createServerFn({ method: "POST" })
     }) => input
   )
   .handler(async ({ data }) => {
+    const db = getDatabase()
     const [round] = await db
       .insert(fundingRounds)
       .values({
@@ -65,6 +68,7 @@ export const updateFundingRound = createServerFn({ method: "POST" })
     }) => input
   )
   .handler(async ({ data }) => {
+    const db = getDatabase()
     const { id, ...fields } = data;
     const [updated] = await db
       .update(fundingRounds)
@@ -78,6 +82,7 @@ export const deleteFundingRound = createServerFn({ method: "POST" })
   .middleware([requireAuthMiddleware])
   .inputValidator((input: { id: number }) => input)
   .handler(async ({ data }) => {
+    const db = getDatabase()
     await db
       .update(applications)
       .set({ fundingRoundId: null })
@@ -93,6 +98,7 @@ export const assignApplicationToRound = createServerFn({ method: "POST" })
   .middleware([requireAuthMiddleware])
   .inputValidator((input: { applicationId: number; fundingRoundId: number | null }) => input)
   .handler(async ({ data }) => {
+    const db = getDatabase()
     const [updated] = await db
       .update(applications)
       .set({ fundingRoundId: data.fundingRoundId, updatedAt: new Date() })
@@ -105,6 +111,7 @@ export const getApplicationsForRound = createServerFn({ method: "GET" })
   .middleware([requireAuthMiddleware])
   .inputValidator((input: { roundId: number }) => input)
   .handler(async ({ data }) => {
+    const db = getDatabase()
     const rows = await db
       .select()
       .from(applications)
@@ -117,6 +124,7 @@ export const getRoundStats = createServerFn({ method: "GET" })
   .middleware([requireAuthMiddleware])
   .inputValidator((input: { roundId: number }) => input)
   .handler(async ({ data }) => {
+    const db = getDatabase()
     const roundApps = await db
       .select()
       .from(applications)
