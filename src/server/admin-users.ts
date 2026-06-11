@@ -10,6 +10,7 @@ import {
 export const getAdminUsers = createServerFn({ method: "GET" })
   .middleware([requireAdminRoleMiddleware])
   .handler(async () => {
+    const db = getDatabase()
     const rows = await db
       .select()
       .from(adminUsers)
@@ -29,6 +30,7 @@ export const addAdminUser = createServerFn({ method: "POST" })
     }
   )
   .handler(async ({ data }) => {
+    const db = getDatabase()
     const [user] = await db
       .insert(adminUsers)
       .values({
@@ -52,6 +54,7 @@ export const updateAdminUser = createServerFn({ method: "POST" })
     }
   )
   .handler(async ({ data }) => {
+    const db = getDatabase()
     const updates: Record<string, unknown> = {};
     if (data.email !== undefined) updates.email = data.email.toLowerCase();
     if (data.name !== undefined) updates.name = data.name || null;
@@ -68,6 +71,7 @@ export const removeAdminUser = createServerFn({ method: "POST" })
   .middleware([requireAdminRoleMiddleware])
   .inputValidator((input: { id: number }) => input)
   .handler(async ({ data }) => {
+    const db = getDatabase()
     await db.delete(adminUsers).where(eq(adminUsers.id, data.id));
     return { success: true };
   });
@@ -75,6 +79,7 @@ export const removeAdminUser = createServerFn({ method: "POST" })
 export const isUserAdmin = createServerFn({ method: "GET" })
   .inputValidator((input: { email: string }) => input)
   .handler(async ({ data }) => {
+    const db = getDatabase()
     const admins = await db.select().from(adminUsers);
     if (admins.length === 0)
       return { isAdmin: true, isFirstUser: true, role: "admin" as const };
@@ -92,6 +97,7 @@ export const autoRegisterFirstAdmin = createServerFn({ method: "POST" })
   .middleware([requireAuthMiddleware])
   .inputValidator((input: { email: string; name?: string }) => input)
   .handler(async ({ data }) => {
+    const db = getDatabase()
     const admins = await db.select().from(adminUsers);
     if (admins.length > 0) return null;
     const [user] = await db
