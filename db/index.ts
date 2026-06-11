@@ -4,17 +4,21 @@ import * as schema from './schema.js'
 
 export type DB = NeonHttpDatabase<typeof schema>
 
-let _db: DB | null = null
-
 export function getDatabase(): DB {
-  if (_db) return _db
-  const connectionString = process.env.NITRO_POSTGRES_URL || process.env.POSTGRES_URL
+  const connectionString = 
+    process.env.TEST_DB_URL ||
+    process.env.DATABASE_URL ||
+    process.env.POSTGRES_URL || 
+    process.env.NITRO_POSTGRES_URL
+
+  console.log('ENV KEYS:', Object.keys(process.env).join(', '))
+  console.log('CONNECTION STRING FOUND:', !!connectionString)
+
   if (!connectionString) {
     throw new Error('No database connection string found.')
   }
   const sql = neon(connectionString)
-  _db = drizzle(sql, { schema })
-  return _db
+  return drizzle(sql, { schema })
 }
 
 export const db: DB = new Proxy({} as DB, {
