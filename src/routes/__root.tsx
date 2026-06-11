@@ -5,7 +5,6 @@ import {
   createRootRoute,
 } from "@tanstack/react-router";
 import { ClerkProvider } from '@clerk/tanstack-react-start'
-
 import "../styles.css";
 
 export const Route = createRootRoute({
@@ -25,11 +24,13 @@ export const Route = createRootRoute({
   }),
   shellComponent: RootDocument,
   component: () => (
-<ClerkProvider 
-  publishableKey={import.meta.env.VITE_CLERK_PUBLISHABLE_KEY}
-  signInUrl="/login"
-  signInFallbackRedirectUrl="/admin"
->
+    <ClerkProvider
+      publishableKey={import.meta.env.VITE_CLERK_PUBLISHABLE_KEY}
+      signInUrl="/login"
+      signInFallbackRedirectUrl="/admin"
+    >
+      <Outlet />
+    </ClerkProvider>
   ),
 });
 
