@@ -29,14 +29,17 @@ const getAdminAuth = createServerFn({ method: "GET" }).handler(async () => {
   const { auth } = await import('@clerk/tanstack-react-start/server')
   const { createClerkClient } = await import('@clerk/backend')
 
-  let userId: string | null = null
+  let authResult: any = null
   try {
-    const authResult = await auth()
-    userId = authResult?.userId ?? null
-  } catch {
+    authResult = await auth()
+  } catch (e: any) {
+    console.error('AUTH ERROR:', e?.message)
     return null
   }
 
+  console.log('AUTH RESULT:', JSON.stringify(authResult))
+
+  const userId = authResult?.userId ?? null
   if (!userId) return null
 
   const clerkClient = createClerkClient({
