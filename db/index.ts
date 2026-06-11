@@ -5,7 +5,9 @@ import * as schema from './schema.js'
 export type DB = NeonHttpDatabase<typeof schema>
 
 export function getDatabase(): DB {
-  const connectionString = 
+  console.log('ENV KEYS:', Object.keys(process.env).join(', '))
+  console.log('POSTGRES_URL defined:', !!process.env.POSTGRES_URL)
+  const connectionString =
     process.env.TEST_DB_URL ||
     process.env.DATABASE_URL ||
     process.env.POSTGRES_URL || 
