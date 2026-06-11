@@ -1,10 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
-import { db } from "../../db/index.js";
+import { getDatabase } from "../../db/index.js";
 import { assessments, applications, adminUsers } from "../../db/schema.js";
 import { eq, and, desc } from "drizzle-orm";
 import { requireAuthMiddleware } from "../middleware/identity.js";
 
 async function buildNameMap(): Promise<Map<string, string>> {
+  const db = getDatabase()
   const allAdmins = await db.select().from(adminUsers);
   const map = new Map<string, string>();
   for (const a of allAdmins) {
@@ -28,6 +29,7 @@ async function resolveReviewerName(
   reviewerEmail: string,
   providedName: string
 ): Promise<string> {
+  const db = getDatabase()
   if (providedName && providedName !== reviewerEmail) return providedName;
   const [adminRow] = await db
     .select()
@@ -41,6 +43,7 @@ export const getAssessmentsForApplication = createServerFn({ method: "GET" })
   .middleware([requireAuthMiddleware])
   .inputValidator((input: { applicationId: number }) => input)
   .handler(async ({ data }) => {
+    const db = getDatabase()
     const rows = await db
       .select()
       .from(assessments)
@@ -59,6 +62,7 @@ export const getAssessmentByReviewer = createServerFn({ method: "GET" })
     (input: { applicationId: number; reviewerEmail: string }) => input
   )
   .handler(async ({ data }) => {
+    const db = getDatabase()
     const [row] = await db
       .select()
       .from(assessments)
@@ -90,6 +94,7 @@ export const upsertAssessment = createServerFn({ method: "POST" })
     }) => input
   )
   .handler(async ({ data }) => {
+    const db = getDatabase()
     const { applicationId, reviewerEmail, reviewerName: providedName, ...scores } = data;
     const reviewerName = await resolveReviewerName(reviewerEmail, providedName);
 
@@ -141,6 +146,7 @@ export const deleteAssessment = createServerFn({ method: "POST" })
   .middleware([requireAuthMiddleware])
   .inputValidator((input: { id: number }) => input)
   .handler(async ({ data }) => {
+    const db = getDatabase()
     await db.delete(assessments).where(eq(assessments.id, data.id));
     return { success: true };
   });
@@ -148,6 +154,7 @@ export const deleteAssessment = createServerFn({ method: "POST" })
 export const getAllAssessments = createServerFn({ method: "GET" })
   .middleware([requireAuthMiddleware])
   .handler(async () => {
+    const db = getDatabase()
     const rows = await db
       .select()
       .from(assessments)
@@ -162,6 +169,7 @@ export const getAllAssessments = createServerFn({ method: "GET" })
 export const getApplicationsWithAssessments = createServerFn({ method: "GET" })
   .middleware([requireAuthMiddleware])
   .handler(async () => {
+    const db = getDatabase()
     const allApps = await db
       .select()
       .from(applications)
