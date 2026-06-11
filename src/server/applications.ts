@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { db } from "../../db/index.js";
+import { getDatabase } from "../../db/index.js";
 import { applications, comments, assessments } from "../../db/schema.js";
 import { eq, desc } from "drizzle-orm";
 import { requireAuthMiddleware } from "../middleware/identity.js";
@@ -47,6 +47,7 @@ export const submitApplication = createServerFn({ method: "POST" })
     }) => input
   )
   .handler(async ({ data }) => {
+    const db = getDatabase()
     const [application] = await db
       .insert(applications)
       .values({
@@ -72,6 +73,7 @@ export const submitApplication = createServerFn({ method: "POST" })
 export const getApplications = createServerFn({ method: "GET" })
   .middleware([requireAuthMiddleware])
   .handler(async () => {
+    const db = getDatabase()
     const rows = await db
       .select()
       .from(applications)
@@ -83,6 +85,7 @@ export const getApplicationById = createServerFn({ method: "GET" })
   .middleware([requireAuthMiddleware])
   .inputValidator((input: { id: number }) => input)
   .handler(async ({ data }) => {
+    const db = getDatabase()
     const [application] = await db
       .select()
       .from(applications)
@@ -101,6 +104,7 @@ export const updateApplicationStatus = createServerFn({ method: "POST" })
     }) => input
   )
   .handler(async ({ data }) => {
+    const db = getDatabase()
     const updateFields: Record<string, unknown> = {
       status: data.status,
       updatedAt: new Date(),
@@ -133,6 +137,7 @@ export const updateApplicationStatus = createServerFn({ method: "POST" })
 export const getApplicationStats = createServerFn({ method: "GET" })
   .middleware([requireAuthMiddleware])
   .handler(async () => {
+    const db = getDatabase()
     const allApps = await db.select().from(applications);
     const total = allApps.length;
     const submitted = allApps.filter((a) => a.status === "submitted").length;
@@ -219,6 +224,7 @@ export const updateApplication = createServerFn({ method: "POST" })
     }) => input
   )
   .handler(async ({ data }) => {
+    const db = getDatabase()
     const { id, ...fields } = data;
     const [updated] = await db
       .update(applications)
@@ -232,6 +238,7 @@ export const toggleApplicationEligibility = createServerFn({ method: "POST" })
   .middleware([requireAuthMiddleware])
   .inputValidator((input: { id: number; eligible: boolean }) => input)
   .handler(async ({ data }) => {
+    const db = getDatabase()
     const [updated] = await db
       .update(applications)
       .set({ eligible: data.eligible, updatedAt: new Date() })
@@ -244,6 +251,7 @@ export const updateAmountAwarded = createServerFn({ method: "POST" })
   .middleware([requireAuthMiddleware])
   .inputValidator((input: { id: number; amountAwarded: number | null }) => input)
   .handler(async ({ data }) => {
+    const db = getDatabase()
     const [updated] = await db
       .update(applications)
       .set({ amountAwarded: data.amountAwarded, updatedAt: new Date() })
@@ -256,6 +264,7 @@ export const deleteApplication = createServerFn({ method: "POST" })
   .middleware([requireAuthMiddleware])
   .inputValidator((input: { id: number }) => input)
   .handler(async ({ data }) => {
+    const db = getDatabase()
     await db.delete(assessments).where(eq(assessments.applicationId, data.id));
     await db.delete(comments).where(eq(comments.applicationId, data.id));
     const [deleted] = await db
