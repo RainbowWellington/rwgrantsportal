@@ -1,6 +1,6 @@
 import { createMiddleware } from '@tanstack/react-start'
 import { auth, clerkMiddleware } from '@clerk/tanstack-react-start/server'
-import { db } from '../../db/index.js'
+import { getDatabase } from '../../db/index.js'
 import { adminUsers } from '../../db/schema.js'
 import { eq } from 'drizzle-orm'
 
@@ -24,7 +24,7 @@ export const requireAuthMiddleware = createMiddleware().server(async ({ next }) 
     throw new Response('Unauthorized', { status: 401 })
   }
 
-  const adminUser = await db
+  const adminUser = await getDatabase()
     .select()
     .from(adminUsers)
     .where(eq(adminUsers.email, email))
@@ -54,7 +54,7 @@ export const requireAdminRoleMiddleware = createMiddleware().server(async ({ nex
     throw new Response('Unauthorized', { status: 401 })
   }
 
-  const adminUser = await db
+  const adminUser = await getDatabase()
     .select()
     .from(adminUsers)
     .where(eq(adminUsers.email, email))
