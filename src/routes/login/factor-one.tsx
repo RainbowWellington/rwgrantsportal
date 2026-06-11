@@ -1,0 +1,14 @@
+import { SignIn } from '@clerk/tanstack-react-start'
+import { createFileRoute } from '@tanstack/react-router'
+
+export const Route = createFileRoute('/login/factor-one')({
+  component: LoginFactorOne,
+})
+
+function LoginFactorOne() {
+  return (
+    <div className="flex justify-center items-center min-h-screen bg-gray-50">
+      <SignIn routing="path" path="/login" fallbackRedirectUrl="/admin" />
+    </div>
+  )
+}
