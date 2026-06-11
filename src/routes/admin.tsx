@@ -25,32 +25,39 @@ import {
 import { useState } from "react";
 
 export const Route = createFileRoute("/admin")({
-  beforeLoad: async () => {
-    const { auth } = await import('@clerk/tanstack-react-start/server')
-    const { createClerkClient } = await import('@clerk/backend')
+beforeLoad: async () => {
+  const { auth } = await import('@clerk/tanstack-react-start/server')
+  
+  let userId: string | null = null
+  try {
+    const authResult = await auth()
+    userId = authResult?.userId ?? null
+  } catch {
+    throw redirect({ to: '/login' })
+  }
 
-    const { userId } = await auth()
-    if (!userId) {
-      throw redirect({ to: '/login' })
-    }
+  if (!userId) {
+    throw redirect({ to: '/login' })
+  }
 
-    const clerkClient = createClerkClient({
-      secretKey: process.env.CLERK_SECRET_KEY,
-    })
-    const clerkUser = await clerkClient.users.getUser(userId)
-    const email = clerkUser.emailAddresses[0]?.emailAddress ?? ''
-    const name = clerkUser.fullName ?? undefined
-    const user = { id: userId, email, name }
+  const { createClerkClient } = await import('@clerk/backend')
+  const clerkClient = createClerkClient({
+    secretKey: process.env.CLERK_SECRET_KEY,
+  })
+  const clerkUser = await clerkClient.users.getUser(userId)
+  const email = clerkUser.emailAddresses[0]?.emailAddress ?? ''
+  const name = clerkUser.fullName ?? undefined
+  const user = { id: userId, email, name }
 
-    const adminCheck = await isUserAdmin({ data: { email } })
-    if (adminCheck.isFirstUser) {
-      await autoRegisterFirstAdmin({ data: { email, name } })
-      return { user, role: 'admin' as const }
-    } else if (!adminCheck.isAdmin) {
-      throw redirect({ to: '/login' })
-    }
-    return { user, role: adminCheck.role ?? ('admin' as const) }
-  },
+  const adminCheck = await isUserAdmin({ data: { email } })
+  if (adminCheck.isFirstUser) {
+    await autoRegisterFirstAdmin({ data: { email, name } })
+    return { user, role: 'admin' as const }
+  } else if (!adminCheck.isAdmin) {
+    throw redirect({ to: '/login' })
+  }
+  return { user, role: adminCheck.role ?? ('admin' as const) }
+},
   component: AdminLayout,
 });
 
