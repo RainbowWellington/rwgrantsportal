@@ -25,9 +25,11 @@ export const Route = createRootRoute({
   }),
   shellComponent: RootDocument,
   component: () => (
-    <ClerkProvider publishableKey={import.meta.env.VITE_CLERK_PUBLISHABLE_KEY}>
-            <Outlet />
-    </ClerkProvider>
+<ClerkProvider 
+  publishableKey={import.meta.env.VITE_CLERK_PUBLISHABLE_KEY}
+  signInUrl="/login"
+  signInFallbackRedirectUrl="/admin"
+>
   ),
 });
 
