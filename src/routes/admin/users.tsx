@@ -7,7 +7,7 @@ import {
 } from "../../server/admin-users.js";
 import { useState, useEffect } from "react";
 import { useIdentity } from "../../lib/identity-context.js";
-import { UserPlus, Trash2, Shield, Mail, Eye, RefreshCw, Pencil, X, Key } from "lucide-react";
+import { UserPlus, Trash2, Shield, Mail, Eye, RefreshCw, Pencil, X } from "lucide-react";
 
 export const Route = createFileRoute("/admin/users")({
   beforeLoad: async ({ context }) => {
@@ -33,39 +33,8 @@ function AdminUsersPage() {
   const [editName, setEditName] = useState("");
   const [editEmail, setEditEmail] = useState("");
   const [editRole, setEditRole] = useState<"reviewer" | "admin">("reviewer");
-  const [editPassword, setEditPassword] = useState("");
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState("");
-
-  const syncIdentityUser = async (
-    email: string,
-    name: string | undefined,
-    method: "POST" | "DELETE"
-  ) => {
-    try {
-      const res = await fetch("/api/manage-identity-user", {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, name }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setIdentityStatus(
-          `Portal updated, but Identity sync failed: ${data.error}`
-        );
-        return;
-      }
-      if (data.alreadyExists) {
-        setIdentityStatus("User already has a Netlify Identity account.");
-      } else if (method === "POST") {
-        setIdentityStatus("Invite email sent to the user.");
-      }
-    } catch {
-      setIdentityStatus(
-        "Portal updated, but could not sync with Netlify Identity."
-      );
-    }
-  };
 
   const loadUsers = async () => {
     const data = await getAdminUsers();
@@ -78,7 +47,6 @@ function AdminUsersPage() {
     setEditName(u.name || "");
     setEditEmail(u.email);
     setEditRole(u.role === "admin" ? "admin" : "reviewer");
-    setEditPassword("");
     setEditError("");
     setIdentityStatus("");
   };
@@ -102,37 +70,7 @@ function AdminUsersPage() {
         },
       });
 
-      const hasIdentityUpdates =
-        emailChanged || editPassword || editName.trim() !== (editingUser.name || "");
-      if (hasIdentityUpdates) {
-        try {
-          const res = await fetch("/api/manage-identity-user", {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              email: editingUser.email,
-              newEmail: emailChanged ? editEmail.trim() : undefined,
-              name: editName.trim(),
-              password: editPassword || undefined,
-            }),
-          });
-          const data = await res.json();
-          if (!res.ok) {
-            setIdentityStatus(
-              `Portal updated, but Identity sync failed: ${data.error}`
-            );
-          } else {
-            setIdentityStatus("User updated successfully.");
-          }
-        } catch {
-          setIdentityStatus(
-            "Portal updated, but could not sync with Netlify Identity."
-          );
-        }
-      } else {
-        setIdentityStatus("User updated successfully.");
-      }
-
+      setIdentityStatus("User updated successfully.");
       setEditingUser(null);
       await loadUsers();
     } catch (err: any) {
@@ -160,7 +98,7 @@ function AdminUsersPage() {
           role,
         },
       });
-      await syncIdentityUser(email.trim(), name.trim() || undefined, "POST");
+      setIdentityStatus("User added. They can now log in with their Clerk account.");
       setEmail("");
       setName("");
       setRole("reviewer");
@@ -180,7 +118,6 @@ function AdminUsersPage() {
     }
     setIdentityStatus("");
     await removeAdminUser({ data: { id } });
-    await syncIdentityUser(adminEmail, undefined, "DELETE");
     await loadUsers();
   };
 
@@ -201,8 +138,8 @@ function AdminUsersPage() {
           Invite User
         </h2>
         <p className="text-sm text-gray-500 mb-4">
-          Add an email address to grant portal access. The user must also have a
-          Netlify Identity account to log in.
+          Add an email address to grant portal access. The user must sign in with
+          their Clerk account to access the portal.
         </p>
 
         {error && (
@@ -350,10 +287,9 @@ function AdminUsersPage() {
 
       <div className="mt-6 bg-blue-50 border border-blue-200 rounded-xl p-4">
         <p className="text-sm text-blue-800">
-          <strong>Note:</strong> Inviting a user here also sends them a Netlify
-          Identity invite email to set up their account. Removing a user also
-          removes their Identity account. Reviewers can view and edit
-          applications but cannot manage users.
+          <strong>Note:</strong> Adding a user here grants them portal access once
+          they sign in via Clerk. Removing a user revokes their portal access.
+          Reviewers can view and edit applications but cannot manage users.
         </p>
       </div>
 
@@ -430,24 +366,6 @@ function AdminUsersPage() {
                     Admin
                   </label>
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1.5">
-                  <Key className="w-3.5 h-3.5" />
-                  New Password
-                </label>
-                <input
-                  type="password"
-                  value={editPassword}
-                  onChange={(e) => setEditPassword(e.target.value)}
-                  placeholder="Leave blank to keep current password"
-                  minLength={8}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Minimum 8 characters. Only fill in if you want to change the password.
-                </p>
               </div>
 
               <div className="flex justify-end gap-3 pt-2">

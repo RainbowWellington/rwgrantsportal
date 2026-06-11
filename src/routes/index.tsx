@@ -83,7 +83,7 @@ function LandingPage() {
           </p>
           <pre className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-sm text-gray-700 overflow-x-auto">
             {`<iframe
-  src="${typeof window !== "undefined" ? window.location.origin : "https://your-site.netlify.app"}/apply"
+  src="${typeof window !== "undefined" ? window.location.origin : "https://your-site.vercel.app"}/apply"
   width="100%"
   height="800"
   frameborder="0"

@@ -11,9 +11,6 @@ export function getDatabase(): DB {
     process.env.POSTGRES_URL || 
     process.env.NITRO_POSTGRES_URL
 
-  console.log('ENV KEYS:', Object.keys(process.env).join(', '))
-  console.log('CONNECTION STRING FOUND:', !!connectionString)
-
   if (!connectionString) {
     throw new Error('No database connection string found.')
   }
