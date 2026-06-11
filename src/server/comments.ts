@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { db } from "../../db/index.js";
+import { getDatabase } from "../../db/index.js";
 import { comments } from "../../db/schema.js";
 import { eq, desc } from "drizzle-orm";
 import { requireAuthMiddleware } from "../middleware/identity.js";
@@ -8,6 +8,7 @@ export const getComments = createServerFn({ method: "GET" })
   .middleware([requireAuthMiddleware])
   .inputValidator((input: { applicationId: number }) => input)
   .handler(async ({ data }) => {
+    const db = getDatabase()
     const rows = await db
       .select()
       .from(comments)
@@ -27,6 +28,7 @@ export const addComment = createServerFn({ method: "POST" })
     }) => input
   )
   .handler(async ({ data }) => {
+    const db = getDatabase()
     const [comment] = await db.insert(comments).values(data).returning();
     return comment;
   });
