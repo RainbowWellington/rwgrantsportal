@@ -2,22 +2,23 @@ import { drizzle, NeonHttpDatabase } from 'drizzle-orm/neon-http'
 import { neon } from '@neondatabase/serverless'
 import * as schema from './schema.js'
 
-let _db: NeonHttpDatabase<typeof schema> | null = null
+export type DB = NeonHttpDatabase<typeof schema>
 
-export function getDatabase() {
-  if (_db) return _db
+function createDb(): DB {
   const connectionString = process.env.NITRO_POSTGRES_URL || process.env.POSTGRES_URL
   if (!connectionString) {
     throw new Error('No database connection string found.')
   }
   const sql = neon(connectionString)
-  _db = drizzle(sql, { schema })
-  return _db
+  return drizzle(sql, { schema })
 }
 
-// Keep db export for backwards compatibility
-export const db = new Proxy({} as NeonHttpDatabase<typeof schema>, {
+export function getDatabase(): DB {
+  return createDb()
+}
+
+export const db: DB = new Proxy({} as DB, {
   get(_target, prop) {
-    return getDatabase()[prop as keyof NeonHttpDatabase<typeof schema>]
+    return createDb()[prop as keyof DB]
   }
 })
