@@ -1,6 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getDatabase } from "../../db/index.js";
-const db = getDatabase();
 import { adminUsers } from "../../db/schema.js";
 import { eq, desc } from "drizzle-orm";
 import {
